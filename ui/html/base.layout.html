@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Forum</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="logo">GoForum</a>
+            <div class="nav-links">
+                {{if .IsLoggedIn}}
+                    <span>Welcome, {{.User.Username}}</span>
+                    <a href="/post/create" class="btn btn-primary">New Post</a>
+                    <a href="/logout" class="btn btn-outline">Logout</a>
+                {{else}}
+                    <a href="/login" class="btn btn-outline">Login</a>
+                    <a href="/register" class="btn btn-primary">Register</a>
+                {{end}}
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        {{template "content" .}}
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Go Forum Project</p>
+    </footer>
+</body>
+</html>

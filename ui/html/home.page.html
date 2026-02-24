@@ -1,0 +1,47 @@
+{{define "content"}}
+<div class="layout-grid">
+    <aside class="sidebar">
+        <h3>Filters</h3>
+        <ul>
+            <li><a href="/">All Posts</a></li>
+            {{if .IsLoggedIn}}
+                <li><a href="/?filter=liked">Liked Posts</a></li>
+                <li><a href="/?filter=created">My Posts</a></li>
+            {{end}}
+        </ul>
+        <h3>Categories</h3>
+        <ul>
+            {{range .Categories}}
+                <li><a href="/?category={{.}}">{{.}}</a></li>
+            {{end}}
+        </ul>
+    </aside>
+
+    <section class="feed">
+        {{if .Posts}}
+            {{range .Posts}}
+            <div class="card post-card">
+                <div class="post-header">
+                    <span class="author">@{{.Author}}</span>
+                    <span class="date">{{.CreatedAt}}</span>
+                </div>
+                <h2>{{.Title}}</h2>
+                <p>{{.Content}}</p>
+                <div class="tags">
+                    {{range .Categories}}<span class="tag">{{.}}</span>{{end}}
+                </div>
+                <div class="post-actions">
+                    <form action="/post/rate" method="POST" style="display:inline;">
+                        <input type="hidden" name="post_id" value="{{.ID}}">
+                        <button type="submit" name="action" value="like" class="btn-icon">👍 {{.Likes}}</button>
+                        <button type="submit" name="action" value="dislike" class="btn-icon">👎 {{.Dislikes}}</button>
+                    </form>
+<a href="/post?id={{.ID}}" class="btn-text">Comments</a>                </div>
+            </div>
+            {{end}}
+        {{else}}
+            <p>No posts found.</p>
+        {{end}}
+    </section>
+</div>
+{{end}}
