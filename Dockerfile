@@ -1,6 +1,5 @@
 # Stage 1: Build
-FROM golang:1.20-alpine AS builder
-
+FROM golang:alpine AS builder
 # Απαραίτητα για SQLite (χρειάζεται gcc)
 RUN apk add --no-cache gcc musl-dev
 
