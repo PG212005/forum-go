@@ -1,29 +1,35 @@
 {{define "content"}}
-<div class="card" style="max-width: 600px; margin: 2rem auto;">
-    <h2>Create a New Post</h2>
-    <form action="/post/create" method="POST">
-        <div class="form-group">
-            <label>Title:</label>
-            <input type="text" name="title" required placeholder="Give your post a title">
-        </div>
+<div class="auth-page">
+    <div class="auth-card" style="max-width: 800px;">
+        <h2 style="text-align: center; margin-bottom: 2rem; font-size: 2.2rem; color: var(--text-main);">✨ Create New Post</h2>
         
-        <div class="form-group">
-            <label>Category:</label>
-            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-                {{range .Categories}}
-                <label style="cursor: pointer;">
-                    <input type="checkbox" name="categories" value="{{.}}"> {{.}}
-                </label>
-                {{end}}
+        <form action="/post/create" method="POST">
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" name="title" required placeholder="What's the topic?">
             </div>
-        </div>
+            
+            <div class="form-group">
+                <label>Categories (Select one or more)</label>
+                <div style="display: flex; gap: 12px; flex-wrap: wrap; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
+                    {{range .Categories}}
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; background: var(--bg-body); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);">
+                        <input type="checkbox" name="categories" value="{{.}}" style="width: auto; margin: 0;"> {{.}}
+                    </label>
+                    {{end}}
+                </div>
+            </div>
 
-        <div class="form-group">
-            <label>Content:</label>
-            <textarea name="content" rows="6" required placeholder="What's on your mind?"></textarea>
-        </div>
+            <div class="form-group">
+                <label>Content</label>
+                <textarea name="content" rows="8" required placeholder="Write your post here..." style="resize: vertical;"></textarea>
+            </div>
 
-        <button type="submit" class="btn-primary">Publish Post</button>
-    </form>
+            <div style="display: flex; gap: 15px; margin-top: 2rem;">
+                <a href="/" class="btn btn-outline" style="flex: 1; text-align: center; padding: 0.8rem; border: 1px solid var(--border); color: white;">Cancel</a>
+                <button type="submit" class="btn btn-primary" style="flex: 2; padding: 1rem; font-size: 1.1rem;">🚀 Publish Post</button>
+            </div>
+        </form>
+    </div>
 </div>
 {{end}}

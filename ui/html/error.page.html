@@ -1,7 +1,10 @@
 {{define "content"}}
-<div style="text-align: center; padding: 4rem 1rem;">
-    <h1 style="font-size: 4rem; color: #e74c3c; margin-bottom: 1rem;">{{.Error}}</h1>
-    <p style="font-size: 1.5rem; color: #666; margin-bottom: 2rem;">Oops! Something went wrong.</p>
-    <a href="/" class="btn-primary">Go Back Home</a>
+<div class="auth-page">
+    <div class="auth-card" style="text-align: center; border-color: var(--danger);">
+        <h1 style="font-size: 6rem; color: var(--danger); margin-bottom: 1rem; text-shadow: 0 0 20px rgba(239, 68, 68, 0.3);">{{.Error}}</h1>
+        <h2 style="margin-bottom: 1.5rem;">Oops! Something went wrong</h2>
+        <p style="color: var(--text-muted); margin-bottom: 2.5rem; font-size: 1.1rem;">We couldn't find what you were looking for or a server error occurred.</p>
+        <a href="/" class="btn btn-primary" style="padding: 1rem 3rem;">🔙 Take Me Home</a>
+    </div>
 </div>
 {{end}}

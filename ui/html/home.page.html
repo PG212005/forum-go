@@ -1,47 +1,123 @@
 {{define "content"}}
+<style>
+    /* Ορίζουμε ένα Grid Layout: 300px αριστερά, το υπόλοιπο δεξιά */
+    .layout-grid {
+        display: grid;
+        grid-template-columns: 320px 1fr; /* Σταθερό Sidebar, Ευέλικτα Posts */
+        gap: 40px;                        /* Κενό ανάμεσα στις στήλες */
+        width: 95%;
+        max-width: 1600px;                /* Τεράστιο όριο για μεγάλες οθόνες */
+        margin: 40px auto;
+        padding: 0 20px;
+        align-items: start;               /* Τα κουτιά ξεκινάνε από πάνω */
+    }
+
+    /* Στυλ για το Sidebar */
+    .sidebar-area {
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 16px;
+        padding: 25px;
+        position: sticky;
+        top: 100px; /* Για να σε ακολουθεί όταν scrolle-άρεις */
+    }
+
+    /* Στυλ για τη στήλη των Posts */
+    .posts-area {
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+        min-width: 0; /* Σημαντικό: Αποτρέπει το σπάσιμο του Grid */
+    }
+
+    /* Η κάρτα του Post */
+    .post-card {
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 16px;
+        padding: 30px; /* Άνετο padding */
+        width: 100%;   /* Πιάνει όλο το πλάτος της στήλης του */
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        box-sizing: border-box;
+    }
+
+    /* Mobile Responsive: Σε μικρές οθόνες γίνονται όλα μια στήλη */
+    @media (max-width: 1000px) {
+        .layout-grid {
+            grid-template-columns: 1fr;
+        }
+        .sidebar-area {
+            position: static;
+        }
+    }
+    
+    /* Links & Text Styles */
+    .filter-link { display: block; padding: 8px 0; color: #94a3b8; text-decoration: none; font-size: 1.1rem; }
+    .filter-link:hover { color: #6366f1; }
+    
+    .category-tag { background: rgba(99, 102, 241, 0.1); color: #818cf8; padding: 6px 12px; border-radius: 8px; text-decoration: none; font-size: 0.9rem; margin: 4px; display: inline-block; }
+    
+    .post-title a { color: #f1f5f9; text-decoration: none; font-size: 2rem; font-weight: 700; line-height: 1.3; }
+    .post-content { color: #cbd5e1; font-size: 1.2rem; line-height: 1.7; margin-top: 15px; }
+</style>
+
 <div class="layout-grid">
-    <aside class="sidebar">
-        <h3>Filters</h3>
-        <ul>
-            <li><a href="/">All Posts</a></li>
-            {{if .IsLoggedIn}}
-                <li><a href="/?filter=liked">Liked Posts</a></li>
-                <li><a href="/?filter=created">My Posts</a></li>
-            {{end}}
-        </ul>
-        <h3>Categories</h3>
-        <ul>
+    
+    <aside class="sidebar-area">
+        <h3 style="color: white; margin-bottom: 20px;">Filters</h3>
+        <div style="margin-bottom: 30px;">
+            <a href="/" class="filter-link">🏠 All Posts</a>
+            <a href="/?filter=liked" class="filter-link">❤️ Liked Posts</a>
+            <a href="/?filter=created" class="filter-link">📝 My Posts</a>
+        </div>
+        
+        <h3 style="color: white; margin-bottom: 15px;">Categories</h3>
+        <div>
             {{range .Categories}}
-                <li><a href="/?category={{.}}">{{.}}</a></li>
+            <a href="/?category={{.}}" class="category-tag">#{{.}}</a>
             {{end}}
-        </ul>
+        </div>
+
+        <div style="margin-top: 40px; text-align: center;">
+            <a href="/post/create" style="background: linear-gradient(135deg, #6366f1, #a855f7); color: white; padding: 15px 30px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 1.1rem; display: block;">+ Create Post</a>
+        </div>
     </aside>
 
-    <section class="feed">
+    <main class="posts-area">
         {{if .Posts}}
             {{range .Posts}}
-            <div class="card post-card">
-                <div class="post-header">
-                    <span class="author">@{{.Author}}</span>
-                    <span class="date">{{.CreatedAt}}</span>
+            <div class="post-card">
+                <div style="display: flex; justify-content: space-between; color: #94a3b8; margin-bottom: 15px;">
+                    <span style="font-weight: 600;">@{{.Author}}</span>
+                    <span>{{.CreatedAt}}</span>
                 </div>
-                <h2>{{.Title}}</h2>
-                <p>{{.Content}}</p>
-                <div class="tags">
-                    {{range .Categories}}<span class="tag">{{.}}</span>{{end}}
+                
+                <div class="post-title">
+                    <a href="/post?id={{.ID}}">{{.Title}}</a>
                 </div>
-                <div class="post-actions">
-                    <form action="/post/rate" method="POST" style="display:inline;">
-                        <input type="hidden" name="post_id" value="{{.ID}}">
-                        <button type="submit" name="action" value="like" class="btn-icon">👍 {{.Likes}}</button>
-                        <button type="submit" name="action" value="dislike" class="btn-icon">👎 {{.Dislikes}}</button>
-                    </form>
-<a href="/post?id={{.ID}}" class="btn-text">Comments</a>                </div>
+                
+                <p class="post-content">{{.Content}}</p>
+                
+                <div style="margin-top: 20px;">
+                    {{range .Categories}}
+                    <span style="border: 1px solid #4f46e5; color: #a5b4fc; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px;">{{.}}</span>
+                    {{end}}
+                </div>
+
+                <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #334155; display: flex; align-items: center; gap: 20px;">
+                    <span style="color: #22c55e; font-weight: bold; font-size: 1.1rem;">👍 {{.Likes}}</span>
+                    <span style="color: #ef4444; font-weight: bold; font-size: 1.1rem;">👎 {{.Dislikes}}</span>
+                    <a href="/post?id={{.ID}}" style="margin-left: auto; color: #6366f1; font-weight: 600; font-size: 1.1rem;">💬 View Comments</a>
+                </div>
             </div>
             {{end}}
         {{else}}
-            <p>No posts found.</p>
+            <div class="post-card" style="text-align: center; padding: 60px;">
+                <h2 style="color: white;">No posts found yet! 🚀</h2>
+                <p style="color: #94a3b8; margin-top: 10px;">Be the first to start the conversation.</p>
+            </div>
         {{end}}
-    </section>
+    </main>
+
 </div>
 {{end}}

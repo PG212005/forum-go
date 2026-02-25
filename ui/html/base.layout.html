@@ -9,27 +9,26 @@
 </head>
 <body>
     <nav class="navbar">
-        <div class="container">
+        <div class="nav-container">
             <a href="/" class="logo">GoForum</a>
             <div class="nav-links">
                 {{if .IsLoggedIn}}
-                    <span>Welcome, {{.User.Username}}</span>
-                    <a href="/post/create" class="btn btn-primary">New Post</a>
-                    <a href="/logout" class="btn btn-outline">Logout</a>
+                    <span style="margin-right: 1rem;">Welcome, <b>{{.User.Username}}</b></span>
+                    <a href="/logout" class="btn btn-outline" style="color: white; border: 1px solid var(--border);">Logout</a>
                 {{else}}
-                    <a href="/login" class="btn btn-outline">Login</a>
+                    <a href="/login" style="margin-right: 1rem; color: white; text-decoration: none;">Login</a>
                     <a href="/register" class="btn btn-primary">Register</a>
                 {{end}}
             </div>
         </div>
     </nav>
 
-    <main class="container">
+    <main>
         {{template "content" .}}
     </main>
 
     <footer>
-        <p>&copy; 2025 Go Forum Project</p>
+        <p style="text-align: center; padding: 2rem; color: var(--text-muted);">&copy; 2025 Go Forum Project</p>
     </footer>
 </body>
 </html>

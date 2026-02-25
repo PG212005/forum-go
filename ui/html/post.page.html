@@ -1,64 +1,60 @@
 {{define "content"}}
-<div class="layout-grid">
-    <div style="grid-column: 1 / -1;">
-        <div class="card">
-            <div class="post-header">
-                <span>Posted by <strong>{{.Post.Author}}</strong></span>
-                <span>{{.Post.CreatedAt}}</span>
-            </div>
-            <h1>{{.Post.Title}}</h1>
-            <p style="font-size: 1.1rem; margin: 1rem 0;">{{.Post.Content}}</p>
+<div style="max-width: 1000px; margin: 40px auto; padding: 0 20px;">
+    <div class="card" style="padding: 40px; border-color: var(--primary);">
+        <div style="display: flex; justify-content: space-between; color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">
+            <span style="color: var(--primary); font-weight: 600;">@{{.Post.Author}}</span>
+            <span>{{.Post.CreatedAt}}</span>
+        </div>
+        
+        <h1 style="font-size: 2.8rem; margin-bottom: 20px; line-height: 1.2;">{{.Post.Title}}</h1>
+        <p style="font-size: 1.3rem; color: #cbd5e1; line-height: 1.7;">{{.Post.Content}}</p>
+        
+        <div style="margin-top: 30px; border-top: 1px solid var(--border); padding-top: 20px; display: flex; align-items: center; gap: 20px;">
+            <form action="/post/rate" method="POST" style="display: flex; gap: 15px;">
+                <input type="hidden" name="post_id" value="{{.Post.ID}}">
+                <button type="submit" name="action" value="like" style="background: transparent; border: none; color: var(--success); cursor: pointer; font-size: 1.3rem;">👍 {{.Post.Likes}}</button>
+                <button type="submit" name="action" value="dislike" style="background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 1.3rem;">👎 {{.Post.Dislikes}}</button>
+            </form>
             
-            <div class="tags">
-                {{range .Post.Categories}}<span class="tag">{{.}}</span>{{end}}
-            </div>
-
-            <hr style="margin: 1.5rem 0; border: 0; border-top: 1px solid #eee;">
-
-            <div class="post-actions">
-                <form action="/post/rate" method="POST" style="display:inline;">
-                    <input type="hidden" name="post_id" value="{{.Post.ID}}">
-                    <button type="submit" name="action" value="like" class="btn-icon">👍 {{.Post.Likes}}</button>
-                    <button type="submit" name="action" value="dislike" class="btn-icon">👎 {{.Post.Dislikes}}</button>
-                </form>
+            <div style="margin-left: auto;">
+                {{range .Post.Categories}}
+                <span class="tag" style="background: rgba(99, 102, 241, 0.1); border: 1px solid var(--primary);">#{{.}}</span>
+                {{end}}
             </div>
         </div>
+    </div>
+
+    <div style="margin-top: 50px;">
+        <h2 style="margin-bottom: 30px;">Comments ({{len .Comments}})</h2>
 
         {{if .IsLoggedIn}}
-        <div class="card" style="background: #f9fafb;">
-            <h3>Leave a comment</h3>
+        <div class="card" style="background: rgba(30, 41, 59, 0.5); border: 1px dashed var(--primary);">
+            <h3 style="margin-bottom: 15px;">Leave a comment</h3>
             <form action="/comment/create" method="POST">
                 <input type="hidden" name="post_id" value="{{.Post.ID}}">
-                <div class="form-group">
-                    <textarea name="content" rows="3" required placeholder="Write your comment here..."></textarea>
-                </div>
-                <button type="submit" class="btn-primary">Post Comment</button>
+                <textarea name="content" rows="4" required placeholder="Add to the conversation..."></textarea>
+                <button type="submit" class="btn btn-primary" style="margin-top: 15px; width: auto; padding: 10px 30px;">Post Comment</button>
             </form>
         </div>
         {{else}}
-        <p><a href="/login">Login</a> to leave a comment.</p>
+        <p style="text-align: center; padding: 20px; color: var(--text-muted);">Please <a href="/login" style="color: var(--primary);">login</a> to comment.</p>
         {{end}}
 
-        <h3>Comments ({{len .Comments}})</h3>
-        {{if .Comments}}
-            {{range .Comments}}
-            <div class="card" style="padding: 1rem; margin-bottom: 1rem;">
-                <div class="post-header">
-                    <strong>{{.Author}}</strong> <span style="font-size: 0.8em;">{{.CreatedAt}}</span>
-                </div>
-                <p>{{.Content}}</p>
-                
-                <div class="post-actions" style="margin-top: 0.5rem;">
-                    <form action="/comment/rate" method="POST">
-                        <input type="hidden" name="comment_id" value="{{.ID}}">
-                        <button type="submit" name="action" value="like" class="btn-icon" style="font-size: 0.9rem;">👍 {{.Likes}}</button>
-                        <button type="submit" name="action" value="dislike" class="btn-icon" style="font-size: 0.9rem;">👎 {{.Dislikes}}</button>
-                    </form>
-                </div>
+        {{range .Comments}}
+        <div class="card" style="padding: 20px; margin-bottom: 20px; background: rgba(15, 23, 42, 0.4);">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.9rem;">
+                <strong style="color: var(--text-main);">@{{.Author}}</strong>
+                <span style="color: var(--text-muted);">{{.CreatedAt}}</span>
             </div>
-            {{end}}
-        {{else}}
-            <p style="color: #666;">No comments yet. Be the first!</p>
+            <p style="color: #cbd5e1;">{{.Content}}</p>
+            <div style="margin-top: 15px; display: flex; gap: 15px;">
+                <form action="/comment/rate" method="POST">
+                    <input type="hidden" name="comment_id" value="{{.ID}}">
+                    <button type="submit" name="action" value="like" style="background: transparent; border: none; color: var(--success); cursor: pointer;">👍 {{.Likes}}</button>
+                    <button type="submit" name="action" value="dislike" style="background: transparent; border: none; color: var(--danger); cursor: pointer; margin-left: 10px;">👎 {{.Dislikes}}</button>
+                </form>
+            </div>
+        </div>
         {{end}}
     </div>
 </div>
