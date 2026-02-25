@@ -18,6 +18,7 @@ type PageData struct {
 	Comments   []models.Comment // Για comments
 	Categories []string         // Για τα φίλτρα και τη δημιουργία
 	Filter     string           // Ποιο φίλτρο είναι ενεργό
+	Error      string
 }
 
 // Home handles the main page and filters

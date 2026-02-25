@@ -3,6 +3,7 @@ package handlers
 import (
 	"forum/internal/database"
 	"forum/internal/models"
+	"html/template"
 	"net/http"
 	"time"
 )
@@ -33,4 +34,20 @@ func GetUserFromSession(r *http.Request) (models.User, bool) {
 	}
 
 	return user, true
+}
+
+// ErrorPage shows a nice error page
+func ErrorPage(w http.ResponseWriter, statusCode int, message string) {
+	w.WriteHeader(statusCode) // Σημαντικό για το Audit (να επιστρέφει σωστό status code)
+
+	tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/error.page.html")
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	data := PageData{
+		Error: message, // Χρησιμοποιούμε το πεδίο Error για τον τίτλο (π.χ. "404")
+	}
+	tmpl.Execute(w, data)
 }

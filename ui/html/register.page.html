@@ -22,4 +22,13 @@
         Already have an account? <a href="/login">Login here</a>.
     </p>
 </div>
+<h2 style="text-align: center; margin-bottom: 1.5rem;">Register</h2>
+
+    {{if .Error}}
+    <div style="background-color: #fee2e2; color: #dc2626; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; text-align: center; border: 1px solid #fca5a5;">
+        {{.Error}}
+    </div>
+    {{end}}
+
+    <form action="/register" method="POST">
 {{end}}

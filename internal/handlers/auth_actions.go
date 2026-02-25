@@ -13,26 +13,24 @@ import (
 
 // RegisterUser handles user registration
 func RegisterUser(w http.ResponseWriter, r *http.Request) {
-	// 1. GET Request: Εμφάνισε τη φόρμα
+	// 1. GET Request
 	if r.Method == http.MethodGet {
-		tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/register.page.html")
-		if err != nil {
-			http.Error(w, "Template error", http.StatusInternalServerError)
-			return
-		}
+		tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/register.page.html")
 		data := PageData{IsLoggedIn: false}
 		tmpl.Execute(w, data)
 		return
 	}
 
-	// 2. POST Request: Κάνε την εγγραφή
+	// 2. POST Request
 	if r.Method == http.MethodPost {
 		email := r.FormValue("email")
 		username := r.FormValue("username")
 		password := r.FormValue("password")
 
+		// Έλεγχος κενών
 		if email == "" || username == "" || password == "" {
-			http.Error(w, "All fields are required", http.StatusBadRequest)
+			tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/register.page.html")
+			tmpl.Execute(w, PageData{IsLoggedIn: false, Error: "All fields are required"})
 			return
 		}
 
@@ -40,7 +38,9 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 
 		_, err := database.DB.Exec("INSERT INTO users (email, username, password) VALUES (?, ?, ?)", email, username, hashedPassword)
 		if err != nil {
-			http.Error(w, "Username or Email already taken", http.StatusBadRequest)
+			// ΔΙΟΡΘΩΣΗ: Αντί για http.Error, ξαναδείχνουμε τη φόρμα με μήνυμα
+			tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/register.page.html")
+			tmpl.Execute(w, PageData{IsLoggedIn: false, Error: "Username or Email already taken"})
 			return
 		}
 
@@ -49,20 +49,17 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 }
 
 // LoginUser handles user login
+// LoginUser handles user login
 func LoginUser(w http.ResponseWriter, r *http.Request) {
-	// 1. GET Request: Εμφάνισε τη φόρμα
+	// 1. GET Request: Show Form
 	if r.Method == http.MethodGet {
-		tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/login.page.html")
-		if err != nil {
-			http.Error(w, "Template error", http.StatusInternalServerError)
-			return
-		}
+		tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/login.page.html")
 		data := PageData{IsLoggedIn: false}
 		tmpl.Execute(w, data)
 		return
 	}
 
-	// 2. POST Request: Κάνε Login
+	// 2. POST Request: Process Login
 	if r.Method == http.MethodPost {
 		email := r.FormValue("email")
 		password := r.FormValue("password")
@@ -71,18 +68,22 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		var storedPassword string
 		err := database.DB.QueryRow("SELECT id, password FROM users WHERE email = ?", email).Scan(&id, &storedPassword)
 
+		// ΕΔΩ ΕΙΝΑΙ Η ΑΛΛΑΓΗ:
 		if err == sql.ErrNoRows || bcrypt.CompareHashAndPassword([]byte(storedPassword), []byte(password)) != nil {
-			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			// Αντί για http.Error, ξαναφορτώνουμε τη σελίδα με μήνυμα Error
+			tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/login.page.html")
+			data := PageData{
+				IsLoggedIn: false,
+				Error:      "Invalid email or password", // Το μήνυμα λάθους
+			}
+			tmpl.Execute(w, data)
 			return
 		}
 
-		// Διαγραφή παλιών sessions
+		// ... (Ο υπόλοιπος κώδικας για το Session παραμένει ίδιος) ...
 		database.DB.Exec("DELETE FROM sessions WHERE user_id = ?", id)
-
-		// Νέο session
 		sessionToken, _ := uuid.NewV4()
 		expiresAt := time.Now().Add(1 * time.Hour)
-
 		database.DB.Exec("INSERT INTO sessions (uuid, user_id, expires_at) VALUES (?, ?, ?)", sessionToken.String(), id, expiresAt)
 
 		http.SetCookie(w, &http.Cookie{
@@ -103,10 +104,11 @@ func LogoutUser(w http.ResponseWriter, r *http.Request) {
 		database.DB.Exec("DELETE FROM sessions WHERE uuid = ?", c.Value)
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:    "session_token",
-		Value:   "",
-		Expires: time.Now().Add(-1 * time.Hour),
-		Path:    "/",
+		Name:     "session_token",
+		Value:    "",
+		Expires:  time.Now().Add(-1 * time.Hour),
+		Path:     "/",
+		HttpOnly: true, // <--- ΠΡΟΣΘΗΚΗ: Το JavaScript δεν μπορεί να διαβάσει το cookie
 	})
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
