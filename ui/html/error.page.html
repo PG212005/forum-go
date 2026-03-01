@@ -1,10 +1,10 @@
 {{define "content"}}
 <div class="auth-page">
-    <div class="auth-card" style="text-align: center; border-color: var(--danger);">
-        <h1 style="font-size: 6rem; color: var(--danger); margin-bottom: 1rem; text-shadow: 0 0 20px rgba(239, 68, 68, 0.3);">{{.Error}}</h1>
-        <h2 style="margin-bottom: 1.5rem;">Oops! Something went wrong</h2>
-        <p style="color: var(--text-muted); margin-bottom: 2.5rem; font-size: 1.1rem;">We couldn't find what you were looking for or a server error occurred.</p>
-        <a href="/" class="btn btn-primary" style="padding: 1rem 3rem;">🔙 Take Me Home</a>
+    <div class="auth-card error-card">
+        <h1 class="error-code">{{.Error}}</h1>
+        <h2 class="error-title">Oops! Something went wrong</h2>
+        <p class="error-text">We couldn't find what you were looking for, or a server error occurred.</p>
+        <a href="/" class="btn btn-primary">🔙 Take Me Home</a>
     </div>
 </div>
 {{end}}

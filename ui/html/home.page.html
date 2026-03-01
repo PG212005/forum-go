@@ -1,123 +1,68 @@
 {{define "content"}}
-<style>
-    /* Ορίζουμε ένα Grid Layout: 300px αριστερά, το υπόλοιπο δεξιά */
-    .layout-grid {
-        display: grid;
-        grid-template-columns: 320px 1fr; /* Σταθερό Sidebar, Ευέλικτα Posts */
-        gap: 40px;                        /* Κενό ανάμεσα στις στήλες */
-        width: 95%;
-        max-width: 1600px;                /* Τεράστιο όριο για μεγάλες οθόνες */
-        margin: 40px auto;
-        padding: 0 20px;
-        align-items: start;               /* Τα κουτιά ξεκινάνε από πάνω */
-    }
+<div class="main-layout">
+    <aside class="sidebar">
+        <div class="card sidebar-card">
+            <h3 class="sidebar-title">Filters</h3>
 
-    /* Στυλ για το Sidebar */
-    .sidebar-area {
-        background-color: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 16px;
-        padding: 25px;
-        position: sticky;
-        top: 100px; /* Για να σε ακολουθεί όταν scrolle-άρεις */
-    }
+            <div class="sidebar-links">
+                <a href="/" class="filter-link">All Posts</a>
+                <a href="/?filter=liked" class="filter-link">Liked Posts</a>
+                <a href="/?filter=created" class="filter-link">My Posts</a>
+            </div>
 
-    /* Στυλ για τη στήλη των Posts */
-    .posts-area {
-        display: flex;
-        flex-direction: column;
-        gap: 30px;
-        min-width: 0; /* Σημαντικό: Αποτρέπει το σπάσιμο του Grid */
-    }
+            <h3 class="sidebar-title" style="margin-top: 1.5rem;">Categories</h3>
+            <div class="sidebar-tags">
+                {{range .Categories}}
+                    <a href="/?category={{.}}" class="badge badge--primary">#{{.}}</a>
+                {{end}}
+            </div>
 
-    /* Η κάρτα του Post */
-    .post-card {
-        background-color: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 16px;
-        padding: 30px; /* Άνετο padding */
-        width: 100%;   /* Πιάνει όλο το πλάτος της στήλης του */
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        box-sizing: border-box;
-    }
-
-    /* Mobile Responsive: Σε μικρές οθόνες γίνονται όλα μια στήλη */
-    @media (max-width: 1000px) {
-        .layout-grid {
-            grid-template-columns: 1fr;
-        }
-        .sidebar-area {
-            position: static;
-        }
-    }
-    
-    /* Links & Text Styles */
-    .filter-link { display: block; padding: 8px 0; color: #94a3b8; text-decoration: none; font-size: 1.1rem; }
-    .filter-link:hover { color: #6366f1; }
-    
-    .category-tag { background: rgba(99, 102, 241, 0.1); color: #818cf8; padding: 6px 12px; border-radius: 8px; text-decoration: none; font-size: 0.9rem; margin: 4px; display: inline-block; }
-    
-    .post-title a { color: #f1f5f9; text-decoration: none; font-size: 2rem; font-weight: 700; line-height: 1.3; }
-    .post-content { color: #cbd5e1; font-size: 1.2rem; line-height: 1.7; margin-top: 15px; }
-</style>
-
-<div class="layout-grid">
-    
-    <aside class="sidebar-area">
-        <h3 style="color: white; margin-bottom: 20px;">Filters</h3>
-        <div style="margin-bottom: 30px;">
-            <a href="/" class="filter-link">🏠 All Posts</a>
-            <a href="/?filter=liked" class="filter-link">❤️ Liked Posts</a>
-            <a href="/?filter=created" class="filter-link">📝 My Posts</a>
-        </div>
-        
-        <h3 style="color: white; margin-bottom: 15px;">Categories</h3>
-        <div>
-            {{range .Categories}}
-            <a href="/?category={{.}}" class="category-tag">#{{.}}</a>
-            {{end}}
-        </div>
-
-        <div style="margin-top: 40px; text-align: center;">
-            <a href="/post/create" style="background: linear-gradient(135deg, #6366f1, #a855f7); color: white; padding: 15px 30px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 1.1rem; display: block;">+ Create Post</a>
+            <div class="sidebar-cta">
+                <a href="/post/create" class="btn btn-primary btn-block">+ Create Post</a>
+            </div>
         </div>
     </aside>
 
-    <main class="posts-area">
+    <main class="content-area">
         {{if .Posts}}
             {{range .Posts}}
-            <div class="post-card">
-                <div style="display: flex; justify-content: space-between; color: #94a3b8; margin-bottom: 15px;">
-                    <span style="font-weight: 600;">@{{.Author}}</span>
-                    <span>{{.CreatedAt}}</span>
-                </div>
-                
-                <div class="post-title">
-                    <a href="/post?id={{.ID}}">{{.Title}}</a>
-                </div>
-                
-                <p class="post-content">{{.Content}}</p>
-                
-                <div style="margin-top: 20px;">
-                    {{range .Categories}}
-                    <span style="border: 1px solid #4f46e5; color: #a5b4fc; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px;">{{.}}</span>
-                    {{end}}
-                </div>
+                <div class="card post-card">
+                    <div class="post-header">
+                        <span class="post-author">@{{.Author}}</span>
+                        <span class="post-date">{{.CreatedAt}}</span>
+                    </div>
 
-                <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #334155; display: flex; align-items: center; gap: 20px;">
-                    <span style="color: #22c55e; font-weight: bold; font-size: 1.1rem;">👍 {{.Likes}}</span>
-                    <span style="color: #ef4444; font-weight: bold; font-size: 1.1rem;">👎 {{.Dislikes}}</span>
-                    <a href="/post?id={{.ID}}" style="margin-left: auto; color: #6366f1; font-weight: 600; font-size: 1.1rem;">💬 View Comments</a>
+                    <h2 class="post-title">
+                        <a href="/post?id={{.ID}}">{{.Title}}</a>
+                    </h2>
+
+                    <p class="post-content">{{.Content}}</p>
+
+                    <div class="post-tags">
+                        {{range .Categories}}
+                            <span class="badge badge--primary">{{.}}</span>
+                        {{end}}
+                    </div>
+
+                    <div class="post-actions">
+                        <span class="vote up">△ {{.Likes}}</span>
+                        <span class="vote down">▽ {{.Dislikes}}</span>
+
+                        <a href="/post?id={{.ID}}" class="link">
+                            View comments →
+                        </a>
+                    </div>
                 </div>
-            </div>
             {{end}}
         {{else}}
-            <div class="post-card" style="text-align: center; padding: 60px;">
-                <h2 style="color: white;">No posts found yet! 🚀</h2>
-                <p style="color: #94a3b8; margin-top: 10px;">Be the first to start the conversation.</p>
+            <div class="card empty-state">
+                <h2>No posts found yet!</h2>
+                <p>Be the first to start the conversation.</p>
+                <div style="margin-top: 1.25rem;">
+                    <a href="/post/create" class="btn btn-primary">Create the first post</a>
+                </div>
             </div>
         {{end}}
     </main>
-
 </div>
 {{end}}
