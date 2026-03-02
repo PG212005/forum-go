@@ -39,10 +39,11 @@ func Home(w http.ResponseWriter, r *http.Request) {
 
 	// Δυναμικό SQL Query ανάλογα με τα φίλτρα (AUDIT CRITICAL)
 	baseQuery := `SELECT p.id, p.title, p.content, u.username, p.created_at,
-				  (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = 1) as likes,
-				  (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = -1) as dislikes
-				  FROM posts p
-				  JOIN users u ON p.user_id = u.id`
+              (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = 1) as likes,
+              (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = -1) as dislikes,
+              (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count
+              FROM posts p
+              JOIN users u ON p.user_id = u.id`
 
 	if categoryBy != "" {
 		// Φίλτρο Κατηγορίας
@@ -74,8 +75,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	var posts []models.Post
 	for rows.Next() {
 		var p models.Post
-		rows.Scan(&p.ID, &p.Title, &p.Content, &p.Author, &p.CreatedAt, &p.Likes, &p.Dislikes)
-		// Fetch categories for this post
+		rows.Scan(&p.ID, &p.Title, &p.Content, &p.Author, &p.CreatedAt, &p.Likes, &p.Dislikes, &p.CommentCount)	
 		catRows, _ := database.DB.Query("SELECT c.name FROM categories c JOIN post_categories pc ON c.id = pc.category_id WHERE pc.post_id = ?", p.ID)
 		for catRows.Next() {
 			var cName string

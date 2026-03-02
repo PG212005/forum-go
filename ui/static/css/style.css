@@ -252,6 +252,7 @@ button.vote {
   cursor: pointer;
   font: inherit;
   color: inherit;
+  cursor: pointer;
 }
 .link {
     margin-left: auto;
@@ -344,4 +345,41 @@ textarea:focus {
     .link {
         margin-left: 0;
     }
+}
+/* make vote links look like vote buttons */
+a.vote {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* spacing for the comment bubble */
+.comment-link {
+  margin-left: 10px;
+}
+.vote {
+  display: inline-flex;
+  align-items: center; 
+  line-height: 1;
+  gap: 6px;
+  margin-right: 14px;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.icon-bubble {
+  width: 18px;
+  height: 18px;
+  display: block;
+   transform: translateY(2px);
+}
+.vote-icon {
+  font-size: 20px;   /* bigger arrows */
+  line-height: 1;
+}
+.vote-count {
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
 }

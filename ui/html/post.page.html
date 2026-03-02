@@ -17,55 +17,94 @@
             {{end}}
         </div>
 
-        <div class="post-actions">
-            <form action="/post/rate" method="POST" class="rate-row">
-                <input type="hidden" name="post_id" value="{{.Post.ID}}">
-                <button type="submit" name="action" value="like" class="vote vote-btn">△ {{.Post.Likes}}</button>
-                <button type="submit" name="action" value="dislike" class="vote vote-btn">▽ {{.Post.Dislikes}}</button>
-            </form>
-        </div>
+ <div class="post-actions">
+  {{if $.IsLoggedIn}}
+    <form action="/post/rate" method="POST" class="rate-row">
+      <input type="hidden" name="post_id" value="{{.Post.ID}}">
+      <button type="submit" name="action" value="like" class="vote">
+      <span class="vote-icon">△</span>
+      <span class="vote-count">{{.Post.Likes}}</span>
+      </button>
+
+      <button type="submit" name="action" value="dislike" class="vote">
+      <span class="vote-icon">▽</span>
+      <span class="vote-count">{{.Post.Dislikes}}</span>
+      </button>
+      </form>
+  {{else}}
+    <a href="/login" class="vote">
+  <span class="vote-icon">△</span>
+  <span class="vote-count">{{.Post.Likes}}</span>
+</a>
+    <a href="/login" class="vote">
+  <span class="vote-icon">▽</span>
+  <span class="vote-count">{{.Post.Dislikes}}</span>
+</a>
+  {{end}}
+</div>
     </div>
 
     <!-- Comments -->
-    <div class="comments">
-        <h2 class="section-title">Comments ({{len .Comments}})</h2>
+   <h3 class="section-title">Comments</h3>
 
-        {{if .IsLoggedIn}}
-            <div class="card">
-                <h3 class="section-subtitle">Leave a comment</h3>
-                <form action="/comment/create" method="POST">
-                    <input type="hidden" name="post_id" value="{{.Post.ID}}">
-                    <textarea name="content" rows="4" required placeholder="Add to the conversation..."></textarea>
-                    <div style="margin-top: 1rem;">
-                        <button type="submit" class="btn btn-primary">Post Comment</button>
-                    </div>
-                </form>
-            </div>
-        {{else}}
-            <div class="card empty-state">
-                <p>Please <a href="/login" class="link">login</a> to comment.</p>
-            </div>
-        {{end}}
+{{if $.IsLoggedIn}}
+  <form action="/comment/create" method="POST" class="comment-form">
+    <input type="hidden" name="post_id" value="{{.Post.ID}}">
+    <textarea name="content" placeholder="Write a comment..." required></textarea>
+    <button type="submit" class="btn btn-primary">Post Comment</button>
+  </form>
+{{else}}
+  <div class="card" style="margin-bottom: 1rem;">
+    <p>
+      <a href="/login" class="link">Log in</a> to write a comment.
+    </p>
+  </div>
+{{end}}
 
-        {{range .Comments}}
-            <div class="card comment-card">
-                <div class="comment-header">
-                    <strong class="comment-author">@{{.Author}}</strong>
-                    <span class="comment-date">{{.CreatedAt}}</span>
-                </div>
+<div class="comments-list">
+  {{if .Comments}}
+    {{range .Comments}}
+      <div class="card comment-card">
+        <div class="post-header">
+          <span class="post-author">@{{.Author}}</span>
+          <span class="post-date">{{.CreatedAt}}</span>
+        </div>
 
-                <p class="comment-body">{{.Content}}</p>
+        <p class="post-content">{{.Content}}</p>
 
-                <div class="post-actions">
-                    <form action="/comment/rate" method="POST" class="rate-row">
-                        <input type="hidden" name="comment_id" value="{{.ID}}">
-                        <button type="submit" name="action" value="like" class="vote vote-btn">△ {{.Post.Likes}}</button>
-                        <button type="submit" name="action" value="dislike" class="vote vote-btn">▽ {{.Post.Dislikes}}</button>
-                    </form>
-                </div>
-            </div>
-        {{end}}
+        <div class="post-actions">
+          {{if $.IsLoggedIn}}
+            <form action="/comment/rate" method="POST" class="rate-row">
+              <input type="hidden" name="comment_id" value="{{.ID}}">
+              <button type="submit" name="action" value="like" class="vote">
+                <span class="vote-icon">△</span>
+                <span class="vote-count">{{.Likes}}</span>
+              </button>
+              <button type="submit" name="action" value="dislike" class="vote">
+                <span class="vote-icon">▽</span>
+                <span class="vote-count">{{.Dislikes}}</span>
+                </button>
+            </form>
+          {{else}}
+            <a href="/login" class="vote">
+              <span class="vote-icon">△</span>
+              <span class="vote-count">{{.Likes}}</span>
+            </a>
+
+            <a href="/login" class="vote">
+              <span class="vote-icon">▽</span>
+              <span class="vote-count">{{.Dislikes}}</span>
+              </a>
+          {{end}}
+        </div>
+      </div>
+    {{end}}
+  {{else}}
+    <div class="card empty-state">
+      <p>No comments yet.</p>
     </div>
+  {{end}}
+</div>
 
 </div>
 {{end}}

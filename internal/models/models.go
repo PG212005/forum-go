@@ -19,6 +19,7 @@ type Post struct {
 	Categories    []string
 	Likes         int
 	Dislikes      int
+	CommentCount  int
 	CreatedAt     time.Time
 	FormattedTime string
 }
