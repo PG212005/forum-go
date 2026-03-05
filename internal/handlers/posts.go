@@ -34,6 +34,26 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	filterBy := r.URL.Query().Get("filter")     // liked, created
 	categoryBy := r.URL.Query().Get("category") // tech, health...
 
+	if (filterBy == "liked" || filterBy == "created") && !isLoggedIn {
+		// Παίρνουμε τις κατηγορίες για να μη μείνει άδεια η sidebar (Audit UX)
+		catRows, _ := database.DB.Query("SELECT name FROM categories")
+		var allCats []string
+		for catRows.Next() {
+			var cName string
+			catRows.Scan(&cName)
+			allCats = append(allCats, cName)
+		}
+
+		data := PageData{
+			IsLoggedIn: false,
+			Categories: allCats,
+			Error:      "You must be logged in to view your personalized filters.",
+		}
+
+		tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/home.page.html")
+		tmpl.Execute(w, data)
+		return
+	}
 	var rows *sql.Rows
 	var err error
 
@@ -75,7 +95,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	var posts []models.Post
 	for rows.Next() {
 		var p models.Post
-		rows.Scan(&p.ID, &p.Title, &p.Content, &p.Author, &p.CreatedAt, &p.Likes, &p.Dislikes, &p.CommentCount)	
+		rows.Scan(&p.ID, &p.Title, &p.Content, &p.Author, &p.CreatedAt, &p.Likes, &p.Dislikes, &p.CommentCount)
 		catRows, _ := database.DB.Query("SELECT c.name FROM categories c JOIN post_categories pc ON c.id = pc.category_id WHERE pc.post_id = ?", p.ID)
 		for catRows.Next() {
 			var cName string

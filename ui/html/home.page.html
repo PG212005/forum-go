@@ -24,6 +24,12 @@
     </aside>
 
     <main class="content-area">
+        {{if .Error}}
+            <div class="alert alert--danger" style="margin-bottom: 2rem; padding: 1rem; border-radius: 12px; background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--danger); font-weight: 600;">
+                ⚠️ <strong></strong> {{.Error}}
+                <a href="/login" class="link" style="margin-left: 10px; color: var(--primary); text-decoration: underline;">Είσοδος</a>
+            </div>
+        {{end}}
         {{if .Posts}}
             {{range .Posts}}
                 <div class="card post-card">
