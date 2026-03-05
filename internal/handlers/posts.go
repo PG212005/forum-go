@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"forum/internal/database"
 	"forum/internal/models"
 	"html/template"
@@ -214,8 +215,16 @@ func RatePost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Redirect back to where they came from
-	http.Redirect(w, r, r.Header.Get("Referer"), http.StatusSeeOther)
+	referer := r.Header.Get("Referer")
+
+	// Αν ο χρήστης ήρθε από την κεντρική σελίδα (Home), προσθέτουμε το anchor
+	// Διαφορετικά, αν είναι ήδη στη σελίδα του Post, το αφήνουμε ως έχει
+	target := referer
+	if !strings.Contains(referer, "/post?id=") {
+		target = fmt.Sprintf("/#post-%s", postID)
+	}
+
+	http.Redirect(w, r, target, http.StatusSeeOther)
 }
 
 // ViewPost handles displaying a single post and its comments
