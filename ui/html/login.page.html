@@ -2,6 +2,11 @@
 <div class="auth-page">
     <div class="auth-card">
         <h2 class="auth-title">Welcome Back</h2>
+        {{if .Error}}
+        <div class="alert alert--danger">
+            ⚠️ {{.Error}}
+        </div>
+        {{end}}
 
         <form action="/login" method="POST">
             <div class="form-group">

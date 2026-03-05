@@ -383,3 +383,30 @@ a.vote {
   font-weight: 400 !important;
   line-height: 1 !important;
 }
+.alert {
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    font-weight: 600;
+}
+
+.alert--danger {
+    background: rgba(239, 68, 68, 0.1); /* Απαλό κόκκινο */
+    color: #ef4444; /* Επίπεδο κίνδυνου */
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+.alert {
+    padding: 0.8rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.alert--danger {
+    background: rgba(239, 68, 68, 0.1); /* Απαλό κόκκινο */
+    color: #ef4444; /* Έντονο κόκκινο για το κείμενο */
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}

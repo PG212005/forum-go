@@ -3,6 +3,12 @@
     <div class="auth-card">
         <h2 class="auth-title">Create Account</h2>
 
+        {{if .Error}}
+        <div class="alert alert--danger">
+            ⚠️ {{.Error}}
+        </div>
+        {{end}}
+
         <form action="/register" method="POST">
             <div class="form-group">
                 <label>Username</label>
