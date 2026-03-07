@@ -134,21 +134,46 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Προετοιμασία των κατηγοριών (χρειάζεται και για το GET και για το αποτυχημένο POST)
+	catRows, _ := database.DB.Query("SELECT name FROM categories")
+	var allCats []string
+	for catRows.Next() {
+		var cName string
+		catRows.Scan(&cName)
+		allCats = append(allCats, cName)
+	}
+
 	if r.Method == http.MethodPost {
 		title := r.FormValue("title")
 		content := r.FormValue("content")
-		categories := r.Form["categories"] // List of selected categories
+		categories := r.Form["categories"]
 
-		// Audit check: Empty post
+		// --- ΕΛΕΓΧΟΣ ΣΦΑΛΜΑΤΩΝ ΧΩΡΙΣ http.Error ---
+		var errMsg string
 		if strings.TrimSpace(title) == "" || strings.TrimSpace(content) == "" {
-			http.Error(w, "Title and Content cannot be empty", http.StatusBadRequest)
-			return
+			errMsg = "Title and Content cannot be empty"
+		} else if len(categories) == 0 {
+			errMsg = "At least one category is required"
 		}
-		if len(categories) == 0 {
-			http.Error(w, "At least one category is required", http.StatusBadRequest)
+
+		// Αν βρέθηκε σφάλμα, ξαναφορτώνουμε τη σελίδα με το μήνυμα
+		if errMsg != "" {
+			data := PageData{
+				User:       user,
+				IsLoggedIn: true,
+				Categories: allCats,
+				Error:      errMsg,
+				Post: models.Post{
+					Title:   title,
+					Content: content,
+				},
+			}
+			tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/create.page.html")
+			tmpl.Execute(w, data)
 			return
 		}
 
+		// --- ΣΥΝΕΧΕΙΑ ΜΕ ΤΟ INSERT (Η ΠΑΛΙΑ ΣΟΥ ΛΟΓΙΚΗ) ---
 		res, err := database.DB.Exec("INSERT INTO posts (user_id, title, content) VALUES (?, ?, ?)", user.ID, title, content)
 		if err != nil {
 			http.Error(w, "Server error", http.StatusInternalServerError)
@@ -157,7 +182,6 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 
 		postID, _ := res.LastInsertId()
 
-		// Link categories
 		for _, catName := range categories {
 			var catID int
 			database.DB.QueryRow("SELECT id FROM categories WHERE name = ?", catName).Scan(&catID)
@@ -168,15 +192,7 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// GET Request: Show Form
-	catRows, _ := database.DB.Query("SELECT name FROM categories")
-	var allCats []string
-	for catRows.Next() {
-		var cName string
-		catRows.Scan(&cName)
-		allCats = append(allCats, cName)
-	}
-
+	// GET Request: Εμφάνιση φόρμας κανονικά
 	data := PageData{User: user, IsLoggedIn: true, Categories: allCats}
 	tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/create.page.html")
 	tmpl.Execute(w, data)
