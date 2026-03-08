@@ -1,17 +1,29 @@
 {{define "content"}}
 <div class="auth-page">
     <div class="auth-card">
-        <h2 style="margin-bottom: 2rem; text-align: center;">Welcome Back</h2>
+        <h2 class="auth-title">Welcome Back</h2>
+        {{if .Error}}
+        <div class="alert alert--danger">
+            ⚠️ {{.Error}}
+        </div>
+        {{end}}
+
         <form action="/login" method="POST">
             <div class="form-group">
                 <label>Email</label>
                 <input type="email" name="email" required placeholder="your@email.com">
             </div>
+
             <div class="form-group">
                 <label>Password</label>
                 <input type="password" name="password" required placeholder="••••••••">
             </div>
-            <button type="submit" class="btn btn-primary" style="width: 100%;">Sign In</button>
+
+            <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+
+            <p class="helper center" style="margin-top: 1rem;">
+                Don’t have an account? <a href="/register" class="link">Create one</a>
+            </p>
         </form>
     </div>
 </div>

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"forum/internal/database"
 	"forum/internal/models"
 	"html/template"
@@ -34,15 +35,36 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	filterBy := r.URL.Query().Get("filter")     // liked, created
 	categoryBy := r.URL.Query().Get("category") // tech, health...
 
+	if (filterBy == "liked" || filterBy == "created") && !isLoggedIn {
+		// Παίρνουμε τις κατηγορίες για να μη μείνει άδεια η sidebar (Audit UX)
+		catRows, _ := database.DB.Query("SELECT name FROM categories")
+		var allCats []string
+		for catRows.Next() {
+			var cName string
+			catRows.Scan(&cName)
+			allCats = append(allCats, cName)
+		}
+
+		data := PageData{
+			IsLoggedIn: false,
+			Categories: allCats,
+			Error:      "You must be logged in to view your personalized filters.",
+		}
+
+		tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/home.page.html")
+		tmpl.Execute(w, data)
+		return
+	}
 	var rows *sql.Rows
 	var err error
 
 	// Δυναμικό SQL Query ανάλογα με τα φίλτρα (AUDIT CRITICAL)
 	baseQuery := `SELECT p.id, p.title, p.content, u.username, p.created_at,
-				  (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = 1) as likes,
-				  (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = -1) as dislikes
-				  FROM posts p
-				  JOIN users u ON p.user_id = u.id`
+              (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = 1) as likes,
+              (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = -1) as dislikes,
+              (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count
+              FROM posts p
+              JOIN users u ON p.user_id = u.id`
 
 	if categoryBy != "" {
 		// Φίλτρο Κατηγορίας
@@ -74,8 +96,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	var posts []models.Post
 	for rows.Next() {
 		var p models.Post
-		rows.Scan(&p.ID, &p.Title, &p.Content, &p.Author, &p.CreatedAt, &p.Likes, &p.Dislikes)
-		// Fetch categories for this post
+		rows.Scan(&p.ID, &p.Title, &p.Content, &p.Author, &p.CreatedAt, &p.Likes, &p.Dislikes, &p.CommentCount)
 		catRows, _ := database.DB.Query("SELECT c.name FROM categories c JOIN post_categories pc ON c.id = pc.category_id WHERE pc.post_id = ?", p.ID)
 		for catRows.Next() {
 			var cName string
@@ -113,21 +134,46 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Προετοιμασία των κατηγοριών (χρειάζεται και για το GET και για το αποτυχημένο POST)
+	catRows, _ := database.DB.Query("SELECT name FROM categories")
+	var allCats []string
+	for catRows.Next() {
+		var cName string
+		catRows.Scan(&cName)
+		allCats = append(allCats, cName)
+	}
+
 	if r.Method == http.MethodPost {
 		title := r.FormValue("title")
 		content := r.FormValue("content")
-		categories := r.Form["categories"] // List of selected categories
+		categories := r.Form["categories"]
 
-		// Audit check: Empty post
+		// --- ΕΛΕΓΧΟΣ ΣΦΑΛΜΑΤΩΝ ΧΩΡΙΣ http.Error ---
+		var errMsg string
 		if strings.TrimSpace(title) == "" || strings.TrimSpace(content) == "" {
-			http.Error(w, "Title and Content cannot be empty", http.StatusBadRequest)
-			return
+			errMsg = "Title and Content cannot be empty"
+		} else if len(categories) == 0 {
+			errMsg = "At least one category is required"
 		}
-		if len(categories) == 0 {
-			http.Error(w, "At least one category is required", http.StatusBadRequest)
+
+		// Αν βρέθηκε σφάλμα, ξαναφορτώνουμε τη σελίδα με το μήνυμα
+		if errMsg != "" {
+			data := PageData{
+				User:       user,
+				IsLoggedIn: true,
+				Categories: allCats,
+				Error:      errMsg,
+				Post: models.Post{
+					Title:   title,
+					Content: content,
+				},
+			}
+			tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/create.page.html")
+			tmpl.Execute(w, data)
 			return
 		}
 
+		// --- ΣΥΝΕΧΕΙΑ ΜΕ ΤΟ INSERT (Η ΠΑΛΙΑ ΣΟΥ ΛΟΓΙΚΗ) ---
 		res, err := database.DB.Exec("INSERT INTO posts (user_id, title, content) VALUES (?, ?, ?)", user.ID, title, content)
 		if err != nil {
 			http.Error(w, "Server error", http.StatusInternalServerError)
@@ -136,7 +182,6 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 
 		postID, _ := res.LastInsertId()
 
-		// Link categories
 		for _, catName := range categories {
 			var catID int
 			database.DB.QueryRow("SELECT id FROM categories WHERE name = ?", catName).Scan(&catID)
@@ -147,15 +192,7 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// GET Request: Show Form
-	catRows, _ := database.DB.Query("SELECT name FROM categories")
-	var allCats []string
-	for catRows.Next() {
-		var cName string
-		catRows.Scan(&cName)
-		allCats = append(allCats, cName)
-	}
-
+	// GET Request: Εμφάνιση φόρμας κανονικά
 	data := PageData{User: user, IsLoggedIn: true, Categories: allCats}
 	tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/create.page.html")
 	tmpl.Execute(w, data)
@@ -194,8 +231,16 @@ func RatePost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Redirect back to where they came from
-	http.Redirect(w, r, r.Header.Get("Referer"), http.StatusSeeOther)
+	referer := r.Header.Get("Referer")
+
+	// Αν ο χρήστης ήρθε από την κεντρική σελίδα (Home), προσθέτουμε το anchor
+	// Διαφορετικά, αν είναι ήδη στη σελίδα του Post, το αφήνουμε ως έχει
+	target := referer
+	if !strings.Contains(referer, "/post?id=") {
+		target = fmt.Sprintf("/#post-%s", postID)
+	}
+
+	http.Redirect(w, r, target, http.StatusSeeOther)
 }
 
 // ViewPost handles displaying a single post and its comments
