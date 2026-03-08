@@ -173,7 +173,6 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// --- ΣΥΝΕΧΕΙΑ ΜΕ ΤΟ INSERT (Η ΠΑΛΙΑ ΣΟΥ ΛΟΓΙΚΗ) ---
 		res, err := database.DB.Exec("INSERT INTO posts (user_id, title, content) VALUES (?, ?, ?)", user.ID, title, content)
 		if err != nil {
 			http.Error(w, "Server error", http.StatusInternalServerError)
@@ -308,8 +307,8 @@ func ViewPost(w http.ResponseWriter, r *http.Request) {
 	data := PageData{
 		User:       user,
 		IsLoggedIn: isLoggedIn,
-		Post:       p,        // Το συγκεκριμένο post
-		Comments:   comments, // Τα σχόλιά του
+		Post:       p,
+		Comments:   comments,
 	}
 
 	tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/post.page.html")

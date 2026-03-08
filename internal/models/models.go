@@ -36,13 +36,12 @@ type Comment struct {
 	FormattedTime string
 }
 
-// Στο τέλος του models/models.go
 type PageData struct {
 	IsLoggedIn bool
-	User       User   // Το User struct που ήδη έχεις
-	Posts      []Post // Το Post struct που ήδη έχεις
+	User       User
+	Posts      []Post
 	Post       Post
-	Comments   []Comment // Το Comment struct που ήδη έχεις
+	Comments   []Comment
 	Categories []string
-	Error      string // ΕΔΩ θα μπαίνει το μήνυμα για το audit
+	Error      string
 }
