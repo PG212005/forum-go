@@ -25,7 +25,11 @@ type PageData struct {
 // Home handles the main page and filters
 func Home(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
-		http.NotFound(w, r)
+		// Στέλνουμε το επίσημο 404 Status Code
+		w.WriteHeader(http.StatusNotFound)
+
+		// Δείχνουμε ένα απλό μήνυμα ή ένα template
+		http.Error(w, "404 - page not found", http.StatusNotFound)
 		return
 	}
 
@@ -88,7 +92,10 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+
+		// Βήμα Β: Στέλνεις το μήνυμα σφάλματος
+		http.Error(w, "500 | Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()

@@ -29,6 +29,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 
 		// Έλεγχος κενών
 		if email == "" || username == "" || password == "" {
+			w.WriteHeader(http.StatusBadRequest)
 			tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/register.page.html")
 			tmpl.Execute(w, PageData{IsLoggedIn: false, Error: "All fields are required"})
 			return
