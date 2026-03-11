@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"fmt"
 	"forum/internal/database"
 	"forum/internal/models"
 	"html/template"
+	"log"
 	"net/http"
 	"time"
 )
@@ -15,14 +17,20 @@ func GetUserFromSession(r *http.Request) (models.User, bool) {
 		return models.User{}, false
 	}
 
+	// Έλεγχος αν η βάση είναι nil για αποφυγή panic
+	if database.DB == nil {
+		log.Println("Database connection is nil")
+		return models.User{}, false
+	}
+
 	var user models.User
 	var expiresAt time.Time
 
 	// Join tables to get user info from session
 	query := `SELECT u.id, u.username, s.expires_at 
-			  FROM sessions s 
-			  JOIN users u ON s.user_id = u.id 
-			  WHERE s.uuid = ?`
+              FROM sessions s 
+              JOIN users u ON s.user_id = u.id 
+              WHERE s.uuid = ?`
 
 	err = database.DB.QueryRow(query, c.Value).Scan(&user.ID, &user.Username, &expiresAt)
 	if err != nil {
@@ -38,16 +46,30 @@ func GetUserFromSession(r *http.Request) (models.User, bool) {
 
 // ErrorPage shows a nice error page
 func ErrorPage(w http.ResponseWriter, statusCode int, message string) {
-	w.WriteHeader(statusCode) // Σημαντικό για το Audit (να επιστρέφει σωστό status code)
+	// 1. Ορίζουμε το status code ΠΡΙΝ από οτιδήποτε άλλο (Κρίσιμο για το Audit)
+	w.WriteHeader(statusCode)
 
+	// 2. Προσπάθεια για parsing των templates
 	tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/error.page.html")
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		// ΔΙΟΡΘΩΣΗ: Αν αποτύχει το template, ΔΕΝ ξανακαλούμε την ErrorPage.
+		// Στέλνουμε ένα απλό κείμενο ως έσχατη λύση για να αποφύγουμε το crash.
+		log.Printf("CRITICAL: Template Error in ErrorPage: %v", err)
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		fmt.Fprintf(w, "Error %d: %s (Template missing)", statusCode, message)
 		return
 	}
 
+	// 3. Προετοιμασία δεδομένων
+	// Χρησιμοποιούμε το Error πεδίο της PageData
 	data := PageData{
-		Error: message, // Χρησιμοποιούμε το πεδίο Error για τον τίτλο (π.χ. "404")
+		Error:      message,
+		IsLoggedIn: false,
 	}
-	tmpl.Execute(w, data)
+
+	// 4. Εκτέλεση
+	err = tmpl.Execute(w, data)
+	if err != nil {
+		log.Printf("Execute Error in ErrorPage: %v", err)
+	}
 }

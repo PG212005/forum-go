@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"forum/internal/database"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -24,13 +25,17 @@ func CreateComment(w http.ResponseWriter, r *http.Request) {
 
 	// Audit Check: Empty comment
 	if strings.TrimSpace(content) == "" {
-		http.Error(w, "Comment cannot be empty", http.StatusBadRequest)
+		ErrorPage(w, http.StatusBadRequest, "400 - Bad Request: Empty Comment")
 		return
 	}
 
 	_, err := database.DB.Exec("INSERT INTO comments (post_id, user_id, content) VALUES (?, ?, ?)", postID, user.ID, content)
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		// Καταγράφουμε το πραγματικό σφάλμα στο terminal για εσένα (debugging)
+		log.Printf("Internal Server Error: %v", err)
+
+		// Στέλνουμε στον χρήστη την ErrorPage με κωδικό 500
+		ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
 		return
 	}
 

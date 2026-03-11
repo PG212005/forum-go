@@ -39,9 +39,18 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 
 		_, err := database.DB.Exec("INSERT INTO users (email, username, password) VALUES (?, ?, ?)", email, username, hashedPassword)
 		if err != nil {
-			// ΔΙΟΡΘΩΣΗ: Αντί για http.Error, ξαναδείχνουμε τη φόρμα με μήνυμα
+			// Ορίζουμε το Status Code 400 (Bad Request) ή 409 (Conflict)
+			// πριν το Execute για να το καταγράψει ο browser/audit tool.
+			w.WriteHeader(http.StatusBadRequest)
+
 			tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/register.page.html")
-			tmpl.Execute(w, PageData{IsLoggedIn: false, Error: "Username or Email already taken"})
+
+			// Περνάμε το μήνυμα "Username or Email already taken" στο template
+			data := PageData{
+				IsLoggedIn: false,
+				Error:      "Username or Email already taken",
+			}
+			tmpl.Execute(w, data)
 			return
 		}
 
