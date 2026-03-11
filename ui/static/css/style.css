@@ -410,3 +410,199 @@ a.vote {
     color: #ef4444; /* Έντονο κόκκινο για το κείμενο */
     border: 1px solid rgba(239, 68, 68, 0.2);
 }
+/* Container για τα κουμπιά */
+.oauth-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* Κοινό στυλ για τα κουμπιά */
+.btn-google, .btn-github {
+    display: block;
+    padding: 10px;
+    text-decoration: none;
+    border-radius: 5px;
+    font-weight: bold;
+    transition: opacity 0.3s;
+    color: white !important;
+}
+
+/* Google Χρώμα */
+.btn-google {
+    background-color: #4285F4;
+}
+
+/* GitHub Χρώμα */
+.btn-github {
+    background-color: #333;
+}
+
+.btn-google:hover, .btn-github:hover {
+    opacity: 0.9;
+}
+
+/* Διαχωριστικό (προαιρετικό) */
+.oauth-buttons::after {
+    content: "OR";
+    display: block;
+    margin-top: 10px;
+    font-size: 0.8rem;
+    color: #888;
+}
+/* Διαχωριστικό OR */
+.oauth-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 1.5rem 0;
+    color: #666;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.oauth-divider::before, .oauth-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #ddd;
+}
+
+.oauth-divider span {
+    padding: 0 10px;
+}
+
+/* OAuth Containers & Buttons */
+.oauth-container {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-oauth {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: opacity 0.2s;
+}
+
+.btn-google {
+    background-color: #ffffff;
+    color: #757575;
+    border: 1px solid #ddd;
+}
+
+.btn-github {
+    background-color: #24292e;
+    color: white;
+}
+
+.oauth-icon {
+    width: 18px;
+    height: 18px;
+}
+
+.btn-oauth:hover {
+    opacity: 0.85;
+}
+/* Auth Card Styling */
+/* ================= AUTH PAGES (DARK THEME FIXED) ================= */
+
+.auth-card {
+    max-width: 400px;
+    margin: 3rem auto;
+    padding: 2.5rem;
+    background: var(--bg-card); /* Dark background όπως το υπόλοιπο site */
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+}
+
+.auth-title {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    color: var(--text-main);
+}
+
+/* Διαχωριστικό OR */
+.oauth-divider {
+    display: flex;
+    align-items: center;
+    margin: 1.5rem 0;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+.oauth-divider::before, .oauth-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+.oauth-divider span {
+    padding: 0 15px;
+}
+
+/* OAuth Container */
+.oauth-container {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 1.5rem;
+}
+
+/* Κοινό στυλ κουμπιών OAuth */
+.btn-oauth {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: 1px solid var(--border);
+}
+
+/* ΔΙΟΡΘΩΣΗ ΜΕΓΕΘΟΥΣ ΕΙΚΟΝΙΔΙΩΝ */
+.oauth-icon {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px;
+    margin-right: 8px;
+    display: block;
+}
+
+/* Google Style */
+.btn-google {
+    background: #ffffff !important;
+    color: #1e293b !important;
+}
+
+/* GitHub Style */
+.btn-github {
+    background: #24292e !important;
+    color: #ffffff !important;
+}
+
+.btn-oauth:hover {
+    transform: translateY(-2px);
+    opacity: 0.9;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.helper.center {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}

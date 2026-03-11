@@ -25,12 +25,14 @@ func createTables() {
 
 	queries := []string{
 		`CREATE TABLE IF NOT EXISTS users (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			email TEXT UNIQUE NOT NULL,
-			username TEXT UNIQUE NOT NULL,
-			password TEXT NOT NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		);`,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT, 
+            google_id TEXT UNIQUE,
+            github_id TEXT UNIQUE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );`,
 		`CREATE TABLE IF NOT EXISTS sessions (
 			uuid TEXT PRIMARY KEY,
 			user_id INTEGER NOT NULL,
@@ -85,10 +87,10 @@ func createTables() {
 			log.Fatalf("Error creating table: %v", err)
 		}
 	}
-    
-    // Προσθήκη βασικών κατηγοριών
-    categories := []string{"Technology", "Health", "Music", "General"}
-    for _, cat := range categories {
-        DB.Exec("INSERT OR IGNORE INTO categories (name) VALUES (?)", cat)
-    }
+
+	// Προσθήκη βασικών κατηγοριών
+	categories := []string{"Technology", "Health", "Music", "General"}
+	for _, cat := range categories {
+		DB.Exec("INSERT OR IGNORE INTO categories (name) VALUES (?)", cat)
+	}
 }
