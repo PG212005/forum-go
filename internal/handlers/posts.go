@@ -164,6 +164,7 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if errMsg != "" {
+			w.WriteHeader(http.StatusBadRequest)
 			data := PageData{
 				User:       user,
 				IsLoggedIn: true,
@@ -174,8 +175,11 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 					Content: content,
 				},
 			}
-			tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/create.page.html")
-			tmpl.Execute(w, data)
+			tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/create.page.html")
+			if err != nil {
+				return
+			}
+			_ = tmpl.Execute(w, data)
 			return
 		}
 
@@ -192,7 +196,11 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 			var catID int
 			err := database.DB.QueryRow("SELECT id FROM categories WHERE name = ?", catName).Scan(&catID)
 			if err == nil {
-				database.DB.Exec("INSERT INTO post_categories (post_id, category_id) VALUES (?, ?)", postID, catID)
+				if _, err := database.DB.Exec("INSERT INTO post_categories (post_id, category_id) VALUES (?, ?)", postID, catID); err != nil {
+					log.Printf("Insert Post Category Error: %v", err)
+					ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
+					return
+				}
 			}
 		}
 
@@ -201,8 +209,14 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := PageData{User: user, IsLoggedIn: true, Categories: allCats}
-	tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/create.page.html")
-	tmpl.Execute(w, data)
+	tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/create.page.html")
+	if err != nil {
+		ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
+		return
+	}
+	if err := tmpl.Execute(w, data); err != nil {
+		ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
+	}
 }
 
 // RatePost handles Likes/Dislikes logic
@@ -215,21 +229,53 @@ func RatePost(w http.ResponseWriter, r *http.Request) {
 
 	postID := r.FormValue("post_id")
 	action := r.FormValue("action")
+	if postID == "" {
+		ErrorPage(w, http.StatusBadRequest, "400 - Bad Request: Missing Post ID")
+		return
+	}
+	if action != "like" && action != "dislike" {
+		ErrorPage(w, http.StatusBadRequest, "400 - Bad Request: Invalid Action")
+		return
+	}
+
+	var postExists int
+	err := database.DB.QueryRow("SELECT 1 FROM posts WHERE id = ?", postID).Scan(&postExists)
+	if err == sql.ErrNoRows {
+		ErrorPage(w, http.StatusNotFound, "404 - Post Not Found")
+		return
+	}
+	if err != nil {
+		ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
+		return
+	}
+
 	voteType := 1
 	if action == "dislike" {
 		voteType = -1
 	}
 
 	var existingType int
-	err := database.DB.QueryRow("SELECT type FROM votes WHERE user_id = ? AND post_id = ?", user.ID, postID).Scan(&existingType)
+	err = database.DB.QueryRow("SELECT type FROM votes WHERE user_id = ? AND post_id = ?", user.ID, postID).Scan(&existingType)
 
 	if err == sql.ErrNoRows {
-		database.DB.Exec("INSERT INTO votes (user_id, post_id, type) VALUES (?, ?, ?)", user.ID, postID, voteType)
+		if _, err := database.DB.Exec("INSERT INTO votes (user_id, post_id, type) VALUES (?, ?, ?)", user.ID, postID, voteType); err != nil {
+			ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
+			return
+		}
+	} else if err != nil {
+		ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
+		return
 	} else {
 		if existingType == voteType {
-			database.DB.Exec("DELETE FROM votes WHERE user_id = ? AND post_id = ?", user.ID, postID)
+			if _, err := database.DB.Exec("DELETE FROM votes WHERE user_id = ? AND post_id = ?", user.ID, postID); err != nil {
+				ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
+				return
+			}
 		} else {
-			database.DB.Exec("UPDATE votes SET type = ? WHERE user_id = ? AND post_id = ?", voteType, user.ID, postID)
+			if _, err := database.DB.Exec("UPDATE votes SET type = ? WHERE user_id = ? AND post_id = ?", voteType, user.ID, postID); err != nil {
+				ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
+				return
+			}
 		}
 	}
 

@@ -15,9 +15,15 @@ import (
 func RegisterUser(w http.ResponseWriter, r *http.Request) {
 	// 1. GET Request
 	if r.Method == http.MethodGet {
-		tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/register.page.html")
+		tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/register.page.html")
+		if err != nil {
+			ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
+			return
+		}
 		data := PageData{IsLoggedIn: false}
-		tmpl.Execute(w, data)
+		if err := tmpl.Execute(w, data); err != nil {
+			ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
+		}
 		return
 	}
 
@@ -30,8 +36,11 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 		// Έλεγχος κενών
 		if email == "" || username == "" || password == "" {
 			w.WriteHeader(http.StatusBadRequest)
-			tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/register.page.html")
-			tmpl.Execute(w, PageData{IsLoggedIn: false, Error: "All fields are required"})
+			tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/register.page.html")
+			if err != nil {
+				return
+			}
+			_ = tmpl.Execute(w, PageData{IsLoggedIn: false, Error: "All fields are required"})
 			return
 		}
 
@@ -43,19 +52,25 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 			// πριν το Execute για να το καταγράψει ο browser/audit tool.
 			w.WriteHeader(http.StatusBadRequest)
 
-			tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/register.page.html")
+			tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/register.page.html")
+			if err != nil {
+				return
+			}
 
 			// Περνάμε το μήνυμα "Username or Email already taken" στο template
 			data := PageData{
 				IsLoggedIn: false,
 				Error:      "Username or Email already taken",
 			}
-			tmpl.Execute(w, data)
+			_ = tmpl.Execute(w, data)
 			return
 		}
 
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
 	}
+
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
 // LoginUser handles user login
@@ -63,9 +78,15 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 func LoginUser(w http.ResponseWriter, r *http.Request) {
 	// 1. GET Request: Show Form
 	if r.Method == http.MethodGet {
-		tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/login.page.html")
+		tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/login.page.html")
+		if err != nil {
+			ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
+			return
+		}
 		data := PageData{IsLoggedIn: false}
-		tmpl.Execute(w, data)
+		if err := tmpl.Execute(w, data); err != nil {
+			ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
+		}
 		return
 	}
 
@@ -77,16 +98,24 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		var id int
 		var storedPassword string
 		err := database.DB.QueryRow("SELECT id, password FROM users WHERE email = ?", email).Scan(&id, &storedPassword)
+		if err != nil && err != sql.ErrNoRows {
+			ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
+			return
+		}
 
 		// ΕΔΩ ΕΙΝΑΙ Η ΑΛΛΑΓΗ:
 		if err == sql.ErrNoRows || bcrypt.CompareHashAndPassword([]byte(storedPassword), []byte(password)) != nil {
+			w.WriteHeader(http.StatusBadRequest)
 			// Αντί για http.Error, ξαναφορτώνουμε τη σελίδα με μήνυμα Error
-			tmpl, _ := template.ParseFiles("ui/html/base.layout.html", "ui/html/login.page.html")
+			tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/login.page.html")
+			if err != nil {
+				return
+			}
 			data := PageData{
 				IsLoggedIn: false,
 				Error:      "Invalid email or password", // Το μήνυμα λάθους
 			}
-			tmpl.Execute(w, data)
+			_ = tmpl.Execute(w, data)
 			return
 		}
 
@@ -104,7 +133,10 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		})
 
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
 	}
+
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
 // LogoutUser handles logout
