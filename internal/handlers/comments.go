@@ -27,7 +27,7 @@ func CreateComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Audit Check: Empty comment
+	// Reject comments that are empty after trimming whitespace.
 	if strings.TrimSpace(content) == "" {
 		ErrorPage(w, http.StatusBadRequest, "400 - Bad Request: Empty Comment")
 		return
@@ -35,15 +35,14 @@ func CreateComment(w http.ResponseWriter, r *http.Request) {
 
 	_, err := database.DB.Exec("INSERT INTO comments (post_id, user_id, content) VALUES (?, ?, ?)", postID, user.ID, content)
 	if err != nil {
-		// Καταγράφουμε το πραγματικό σφάλμα στο terminal για εσένα (debugging)
+		// Log the underlying database error for debugging while returning a generic 500 to the client.
 		log.Printf("Internal Server Error: %v", err)
 
-		// Στέλνουμε στον χρήστη την ErrorPage με κωδικό 500
 		ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
 		return
 	}
 
-	// Επιστροφή στο post
+	// Return the user to the post after the comment is created.
 	http.Redirect(w, r, "/post?id="+postID, http.StatusSeeOther)
 }
 
@@ -82,13 +81,12 @@ func RateComment(w http.ResponseWriter, r *http.Request) {
 		voteType = -1
 	}
 
-	// 1. Check existing vote specifically for this COMMENT (comment_id)
+	// Look up an existing vote for this specific comment.
 	var existingType int
-	// Προσοχή: Ελέγχουμε το comment_id, όχι το post_id εδώ
 	err = database.DB.QueryRow("SELECT type FROM votes WHERE user_id = ? AND comment_id = ?", user.ID, commentID).Scan(&existingType)
 
-	if err == sql.ErrNoRows { // Ή sql.ErrNoRows αν έχεις κάνει import το database/sql
-		// New Vote
+	if err == sql.ErrNoRows {
+		// Insert a new vote when the user has not voted on this comment yet.
 		if _, err := database.DB.Exec("INSERT INTO votes (user_id, comment_id, type) VALUES (?, ?, ?)", user.ID, commentID, voteType); err != nil {
 			ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
 			return
@@ -97,15 +95,13 @@ func RateComment(w http.ResponseWriter, r *http.Request) {
 		ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
 		return
 	} else {
-		// Existing Vote logic (Toggle or Change)
+		// Toggle the vote off when the same action is repeated, otherwise switch the vote type.
 		if existingType == voteType {
-			// Clicked same button -> Remove vote (Toggle off)
 			if _, err := database.DB.Exec("DELETE FROM votes WHERE user_id = ? AND comment_id = ?", user.ID, commentID); err != nil {
 				ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
 				return
 			}
 		} else {
-			// Clicked different button -> Update vote
 			if _, err := database.DB.Exec("UPDATE votes SET type = ? WHERE user_id = ? AND comment_id = ?", voteType, user.ID, commentID); err != nil {
 				ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
 				return
@@ -113,6 +109,6 @@ func RateComment(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Redirect back to where they came from (the post page)
+	// Send the user back to the page they came from after voting.
 	http.Redirect(w, r, r.Header.Get("Referer"), http.StatusSeeOther)
 }

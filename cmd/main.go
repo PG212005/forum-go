@@ -13,19 +13,18 @@ import (
 )
 
 func main() {
-	// 1. Έξυπνη φόρτωση του .env
-	// Δοκιμάζει πρώτα στο τρέχον folder και μετά στο cmd/
+	// Load environment variables from the project root first, then fall back to cmd/.
 	err := godotenv.Load(".env")
 	if err != nil {
 		err = godotenv.Load("cmd/.env")
 	}
 
-	// Έλεγχος αν φορτώθηκαν τα κλειδιά
+	// Log a startup warning when OAuth credentials are missing.
 	googleID := os.Getenv("GOOGLE_CLIENT_ID")
 	if googleID == "" {
 		log.Println("⚠️  ΠΡΟΣΟΧΗ: Το .env δεν βρέθηκε ή είναι κενό. Τα OAuth κουμπιά ΔΕΝ θα δουλέψουν.")
 	} else {
-		fmt.Println("✅ Google ID loaded:", googleID[:10], "...") // Εμφανίζει μόνο την αρχή για ασφάλεια
+		fmt.Println("✅ Google ID loaded:", googleID[:10], "...") // Only print a short prefix to avoid exposing the full value.
 	}
 
 	// 2. Initialize Database
@@ -56,7 +55,7 @@ func main() {
 	http.HandleFunc("/comment/create", middleware.RequireLogin(handlers.CreateComment))
 	http.HandleFunc("/comment/rate", middleware.RequireLogin(handlers.RateComment))
 
-	// Middleware για Panic Recovery
+	// Wrap the default mux so unexpected panics return a controlled 500 response.
 	finalHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {

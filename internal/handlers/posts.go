@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// PageData: Δομή για να στέλνουμε δεδομένα στο HTML
+// PageData contains the template data shared across the post-related pages.
 type PageData struct {
 	User       models.User
 	IsLoggedIn bool
@@ -32,11 +32,11 @@ func Home(w http.ResponseWriter, r *http.Request) {
 
 	user, isLoggedIn := GetUserFromSession(r)
 
-	// Λήψη παραμέτρων φίλτρων
+	// Read optional filters from the query string.
 	filterBy := r.URL.Query().Get("filter")     // liked, created
 	categoryBy := r.URL.Query().Get("category") // tech, health...
 
-	// Προετοιμασία sidebar κατηγοριών (για να εμφανίζονται πάντα)
+	// Load categories up front so the sidebar can always be rendered.
 	var allCats []string
 	catRows, err := database.DB.Query("SELECT name FROM categories")
 	if err == nil {
@@ -61,7 +61,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 
 	var rows *sql.Rows
 
-	// Δυναμικό SQL Query ανάλογα με τα φίλτρα
+	// Build the post query dynamically based on the active filters.
 	baseQuery := `SELECT p.id, p.title, p.content, u.username, p.created_at,
               (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = 1) as likes,
               (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = -1) as dislikes,
@@ -102,7 +102,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// ΔΙΟΡΘΩΜΕΝΟ QUERY ΚΑΤΗΓΟΡΙΩΝ (Χωρίς το typo)
+		// Fetch categories per post so the list view can render badges.
 		postCatRows, err := database.DB.Query("SELECT c.name FROM categories c JOIN post_categories pc ON c.id = pc.category_id WHERE pc.post_id = ?", p.ID)
 		if err == nil {
 			for postCatRows.Next() {

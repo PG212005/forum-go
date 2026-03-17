@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-// RequireLogin ελέγχει αν ο χρήστης είναι συνδεδεμένος. Αν όχι, τον στέλνει στο Login.
+// RequireLogin ensures that protected handlers only run for authenticated users.
 func RequireLogin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, isLoggedIn := handlers.GetUserFromSession(r)
