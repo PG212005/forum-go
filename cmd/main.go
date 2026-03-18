@@ -2,21 +2,20 @@ package main
 
 import (
 	"fmt"
+	"forum/internal/config"
 	"forum/internal/database"
 	"forum/internal/handlers"
 	"forum/internal/middleware"
 	"log"
 	"net/http"
 	"os"
-	
-	"github.com/joho/godotenv"
 )
 
 func main() {
 	// Load environment variables from the project root first, then fall back to cmd/.
-	err := godotenv.Load(".env")
+	err := config.LoadEnv(".env")
 	if err != nil {
-		err = godotenv.Load("cmd/.env")
+		err = config.LoadEnv("cmd/.env")
 	}
 
 	// Log a startup warning when OAuth credentials are missing.
@@ -70,8 +69,13 @@ func main() {
 	})
 
 	// Start Server
-	log.Println("🚀 Server started on http://localhost:8080")
-	err = http.ListenAndServe(":8080", finalHandler)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	addr := ":" + port
+	log.Printf("🚀 Server started on http://localhost%s\n", addr)
+	err = http.ListenAndServe(addr, finalHandler)
 	if err != nil {
 		log.Fatal(err)
 	}

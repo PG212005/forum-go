@@ -139,3 +139,23 @@ Check Users:**
 docker system prune -f
 
 Then show them docker images and docker ps -a to prove only your active project objects exist.
+. Σταμάτησε και διάγραψε το Container
+
+Αυτή η εντολή σταματάει το container forum-test και το αφαιρεί από τη λίστα του docker ps -a.
+Bash
+
+docker rm -f forum-test
+
+2. Διάγραψε το Image (Προαιρετικό αλλά προτείνεται)
+
+Αν θέλεις να δείξεις στον auditor ότι το project γίνεται build γρήγορα και σωστά, διέγραψε την εικόνα:
+Bash
+
+docker rmi forum-app
+
+3. Καθάρισε τα πάντα (The Deep Clean)
+
+Για να μην υπάρχει ούτε ίχνος από παλιά πειράματα ή "ορφανά" images (dangling images) που πιάνουν χώρο:
+Bash
+
+docker system prune -f

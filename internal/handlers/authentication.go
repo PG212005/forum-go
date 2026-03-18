@@ -1,48 +1,226 @@
 package handlers
 
 import (
-	"context"
+	"bytes"
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"forum/internal/database"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"strconv"
 	"time" // ΠΡΟΣΘΗΚΗ
 
 	"github.com/gofrs/uuid" // ΠΡΟΣΘΗΚΗ
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 )
 
-// Ρυθμίσεις OAuth από το .env
-func getGoogleConfig() *oauth2.Config {
-	return &oauth2.Config{
+type oauthProviderConfig struct {
+	Name         string
+	RedirectURL  string
+	ClientID     string
+	ClientSecret string
+	AuthURL      string
+	TokenURL     string
+	Scopes       []string
+	UserInfoURL  string
+}
+
+type oauthTokenResponse struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+}
+
+func getGoogleConfig() oauthProviderConfig {
+	return oauthProviderConfig{
+		Name:         "google",
 		RedirectURL:  "http://localhost:8080/auth/google/callback",
 		ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
-		Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
-		Endpoint:     google.Endpoint,
+		AuthURL:      "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:     "https://oauth2.googleapis.com/token",
+		Scopes: []string{
+			"https://www.googleapis.com/auth/userinfo.email",
+			"https://www.googleapis.com/auth/userinfo.profile",
+		},
+		UserInfoURL: "https://www.googleapis.com/oauth2/v2/userinfo",
 	}
 }
 
-func getGithubConfig() *oauth2.Config {
-	return &oauth2.Config{
+func getGithubConfig() oauthProviderConfig {
+	return oauthProviderConfig{
+		Name:         "github",
 		RedirectURL:  "http://localhost:8080/auth/github/callback",
 		ClientID:     os.Getenv("GITHUB_CLIENT_ID"),
 		ClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
+		AuthURL:      "https://github.com/login/oauth/authorize",
+		TokenURL:     "https://github.com/login/oauth/access_token",
 		Scopes:       []string{"user:email"},
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  "https://github.com/login/oauth/authorize",
-			TokenURL: "https://github.com/login/oauth/access_token",
-		},
+		UserInfoURL:  "https://api.github.com/user",
 	}
+}
+
+func newOAuthState() (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", buf), nil
+}
+
+func buildOAuthAuthURL(cfg oauthProviderConfig, state string) string {
+	query := url.Values{}
+	query.Set("client_id", cfg.ClientID)
+	query.Set("redirect_uri", cfg.RedirectURL)
+	query.Set("response_type", "code")
+	query.Set("state", state)
+	if len(cfg.Scopes) > 0 {
+		query.Set("scope", joinScopes(cfg.Scopes))
+	}
+
+	return cfg.AuthURL + "?" + query.Encode()
+}
+
+func joinScopes(scopes []string) string {
+	if len(scopes) == 0 {
+		return ""
+	}
+	result := scopes[0]
+	for i := 1; i < len(scopes); i++ {
+		result += " " + scopes[i]
+	}
+	return result
+}
+
+func startOAuthLogin(w http.ResponseWriter, r *http.Request, cfg oauthProviderConfig) {
+	if cfg.ClientID == "" || cfg.ClientSecret == "" {
+		http.Error(w, "OAuth provider is not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	state, err := newOAuthState()
+	if err != nil {
+		http.Error(w, "Failed to initialize OAuth state", http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     cfg.Name + "_oauth_state",
+		Value:    state,
+		Path:     "/",
+		HttpOnly: true,
+		Expires:  time.Now().Add(10 * time.Minute),
+	})
+
+	http.Redirect(w, r, buildOAuthAuthURL(cfg, state), http.StatusTemporaryRedirect)
+}
+
+func validateOAuthState(r *http.Request, providerName string) bool {
+	state := r.FormValue("state")
+	if state == "" {
+		return false
+	}
+
+	cookie, err := r.Cookie(providerName + "_oauth_state")
+	if err != nil {
+		return false
+	}
+
+	return cookie.Value == state
+}
+
+func exchangeCodeForToken(cfg oauthProviderConfig, code string) (oauthTokenResponse, error) {
+	form := url.Values{}
+	form.Set("client_id", cfg.ClientID)
+	form.Set("client_secret", cfg.ClientSecret)
+	form.Set("code", code)
+	form.Set("redirect_uri", cfg.RedirectURL)
+	form.Set("grant_type", "authorization_code")
+
+	req, err := http.NewRequest(http.MethodPost, cfg.TokenURL, bytes.NewBufferString(form.Encode()))
+	if err != nil {
+		return oauthTokenResponse{}, err
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return oauthTokenResponse{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return oauthTokenResponse{}, fmt.Errorf("token exchange failed: %s", string(body))
+	}
+
+	var token oauthTokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
+		return oauthTokenResponse{}, err
+	}
+	if token.AccessToken == "" {
+		return oauthTokenResponse{}, fmt.Errorf("token response missing access token")
+	}
+
+	return token, nil
+}
+
+func fetchOAuthJSON(accessToken, endpoint string, target any) error {
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("userinfo request failed: %s", string(body))
+	}
+
+	return json.NewDecoder(resp.Body).Decode(target)
+}
+
+func fetchGithubPrimaryEmail(accessToken string) (string, error) {
+	var emails []struct {
+		Email    string `json:"email"`
+		Primary  bool   `json:"primary"`
+		Verified bool   `json:"verified"`
+	}
+
+	if err := fetchOAuthJSON(accessToken, "https://api.github.com/user/emails", &emails); err != nil {
+		return "", err
+	}
+
+	for _, email := range emails {
+		if email.Primary && email.Verified {
+			return email.Email, nil
+		}
+	}
+
+	for _, email := range emails {
+		if email.Verified {
+			return email.Email, nil
+		}
+	}
+
+	return "", nil
 }
 
 // HANDLERS ΓΙΑ GOOGLE
 func GoogleLogin(w http.ResponseWriter, r *http.Request) {
-	url := getGoogleConfig().AuthCodeURL("state-token")
-	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+	startOAuthLogin(w, r, getGoogleConfig())
 }
 
 func GoogleCallback(w http.ResponseWriter, r *http.Request) {
@@ -52,20 +230,15 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := getGoogleConfig().Exchange(context.Background(), code)
-	if err != nil {
-		http.Error(w, "Failed to exchange token", http.StatusBadRequest)
+	cfg := getGoogleConfig()
+	if !validateOAuthState(r, cfg.Name) {
+		http.Error(w, "Invalid OAuth state", http.StatusBadRequest)
 		return
 	}
 
-	resp, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + token.AccessToken)
+	token, err := exchangeCodeForToken(cfg, code)
 	if err != nil {
-		http.Error(w, "Failed to fetch user info", http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		http.Error(w, "Failed to fetch user info", http.StatusInternalServerError)
+		http.Error(w, "Failed to exchange token", http.StatusBadRequest)
 		return
 	}
 
@@ -74,7 +247,7 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		Email string `json:"email"`
 		Name  string `json:"name"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
+	if err := fetchOAuthJSON(token.AccessToken, cfg.UserInfoURL, &userInfo); err != nil {
 		http.Error(w, "Failed to decode user info", http.StatusInternalServerError)
 		return
 	}
@@ -88,8 +261,7 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 
 // HANDLERS ΓΙΑ GITHUB
 func GithubLogin(w http.ResponseWriter, r *http.Request) {
-	url := getGithubConfig().AuthCodeURL("state-token")
-	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+	startOAuthLogin(w, r, getGithubConfig())
 }
 
 func GithubCallback(w http.ResponseWriter, r *http.Request) {
@@ -99,21 +271,15 @@ func GithubCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := getGithubConfig().Exchange(context.Background(), code)
-	if err != nil {
-		http.Error(w, "Failed to exchange GitHub token", http.StatusBadRequest)
+	cfg := getGithubConfig()
+	if !validateOAuthState(r, cfg.Name) {
+		http.Error(w, "Invalid OAuth state", http.StatusBadRequest)
 		return
 	}
 
-	client := getGithubConfig().Client(context.Background(), token)
-	resp, err := client.Get("https://api.github.com/user")
+	token, err := exchangeCodeForToken(cfg, code)
 	if err != nil {
-		http.Error(w, "Failed to fetch GitHub user info", http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		http.Error(w, "Failed to fetch GitHub user info", http.StatusInternalServerError)
+		http.Error(w, "Failed to exchange GitHub token", http.StatusBadRequest)
 		return
 	}
 
@@ -122,7 +288,7 @@ func GithubCallback(w http.ResponseWriter, r *http.Request) {
 		Login string `json:"login"`
 		Email string `json:"email"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
+	if err := fetchOAuthJSON(token.AccessToken, cfg.UserInfoURL, &userInfo); err != nil {
 		http.Error(w, "Failed to decode GitHub user info", http.StatusInternalServerError)
 		return
 	}
@@ -130,8 +296,20 @@ func GithubCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Incomplete GitHub user info", http.StatusBadRequest)
 		return
 	}
+	if userInfo.Email == "" {
+		email, err := fetchGithubPrimaryEmail(token.AccessToken)
+		if err != nil {
+			http.Error(w, "Failed to fetch GitHub email", http.StatusInternalServerError)
+			return
+		}
+		userInfo.Email = email
+	}
+	if userInfo.Email == "" {
+		http.Error(w, "Incomplete GitHub user info", http.StatusBadRequest)
+		return
+	}
 
-	handleOAuthUser(w, r, userInfo.Email, userInfo.Login, fmt.Sprintf("%d", userInfo.ID), "github")
+	handleOAuthUser(w, r, userInfo.Email, userInfo.Login, strconv.Itoa(userInfo.ID), "github")
 }
 
 // ΚΟΙΝΗ ΛΟΓΙΚΗ ΓΙΑ ΟΛΟΥΣ ΤΟΥΣ PROVIDERS
