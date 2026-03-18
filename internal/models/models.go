@@ -16,6 +16,7 @@ type Post struct {
 	Author        string // Για ευκολία στο template
 	Title         string
 	Content       string
+	ImagePath     string
 	Categories    []string
 	Likes         int
 	Dislikes      int

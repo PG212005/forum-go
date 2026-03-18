@@ -8,8 +8,15 @@
             <span class="post-date">{{.Post.CreatedAt}}</span>
         </div>
 
-        <h1 class="post-h1">{{.Post.Title}}</h1>
-        <p class="post-body">{{.Post.Content}}</p>
+       <h1 class="post-h1">{{.Post.Title}}</h1>
+
+{{if .Post.ImagePath}}
+    <div class="post-image">
+        <img src="{{.Post.ImagePath}}" alt="Post image" style="width: 100%; max-width: 500px; max-height: 350px; object-fit: contain; border-radius: 8px; margin: 1rem 0;">
+    </div>
+{{end}}
+
+<p class="post-body">{{.Post.Content}}</p>
 
         <div class="post-tags">
             {{range .Post.Categories}}

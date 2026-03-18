@@ -27,8 +27,7 @@ A robust, web-based forum application designed for user interaction, content cre
 Build and run the entire stack:
 ```bash
 docker build -t forum-app .
-docker run -p 8080:8080 --name forum-container forum-app
-
+docker run --rm -p 8080:8080   -v "$(pwd)/forum.db":/app/forum.db   -v "$(pwd)/uploads":/app/uploads   forum-app
 2. Running Locally
 Bash
 

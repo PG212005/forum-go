@@ -2,13 +2,20 @@ package handlers
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"forum/internal/database"
 	"forum/internal/models"
 	"html/template"
+	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/gofrs/uuid"
 )
 
 // PageData contains the template data shared across the post-related pages.
@@ -16,10 +23,10 @@ type PageData struct {
 	User       models.User
 	IsLoggedIn bool
 	Posts      []models.Post
-	Post       models.Post      // Για single post view
-	Comments   []models.Comment // Για comments
-	Categories []string         // Για τα φίλτρα και τη δημιουργία
-	Filter     string           // Ποιο φίλτρο είναι ενεργό
+	Post       models.Post
+	Comments   []models.Comment
+	Categories []string
+	Filter     string
 	Error      string
 }
 
@@ -32,11 +39,9 @@ func Home(w http.ResponseWriter, r *http.Request) {
 
 	user, isLoggedIn := GetUserFromSession(r)
 
-	// Read optional filters from the query string.
-	filterBy := r.URL.Query().Get("filter")     // liked, created
-	categoryBy := r.URL.Query().Get("category") // tech, health...
+	filterBy := r.URL.Query().Get("filter")
+	categoryBy := r.URL.Query().Get("category")
 
-	// Load categories up front so the sidebar can always be rendered.
 	var allCats []string
 	catRows, err := database.DB.Query("SELECT name FROM categories")
 	if err == nil {
@@ -61,8 +66,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 
 	var rows *sql.Rows
 
-	// Build the post query dynamically based on the active filters.
-	baseQuery := `SELECT p.id, p.title, p.content, u.username, p.created_at,
+	baseQuery := `SELECT p.id, p.title, p.content, p.image_path, u.username, p.created_at,
               (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = 1) as likes,
               (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = -1) as dislikes,
               (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count
@@ -96,13 +100,28 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	var posts []models.Post
 	for rows.Next() {
 		var p models.Post
-		err := rows.Scan(&p.ID, &p.Title, &p.Content, &p.Author, &p.CreatedAt, &p.Likes, &p.Dislikes, &p.CommentCount)
+		var imagePath sql.NullString
+
+		err := rows.Scan(
+			&p.ID,
+			&p.Title,
+			&p.Content,
+			&imagePath,
+			&p.Author,
+			&p.CreatedAt,
+			&p.Likes,
+			&p.Dislikes,
+			&p.CommentCount,
+		)
 		if err != nil {
 			log.Printf("Scan error in Home: %v", err)
 			continue
 		}
 
-		// Fetch categories per post so the list view can render badges.
+		if imagePath.Valid {
+			p.ImagePath = imagePath.String
+		}
+
 		postCatRows, err := database.DB.Query("SELECT c.name FROM categories c JOIN post_categories pc ON c.id = pc.category_id WHERE pc.post_id = ?", p.ID)
 		if err == nil {
 			for postCatRows.Next() {
@@ -112,6 +131,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 			}
 			postCatRows.Close()
 		}
+
 		posts = append(posts, p)
 	}
 
@@ -130,6 +150,61 @@ func Home(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tmpl.Execute(w, data)
+}
+
+const maxUploadSize = 20 << 20 // 20 MB
+
+func saveUploadedImage(file multipart.File, header *multipart.FileHeader) (string, error) {
+	buffer := make([]byte, 512)
+	n, err := file.Read(buffer)
+	if err != nil && err != io.EOF {
+		return "", err
+	}
+
+	contentType := http.DetectContentType(buffer[:n])
+	allowedTypes := map[string]string{
+		"image/jpeg": ".jpg",
+		"image/png":  ".png",
+		"image/gif":  ".gif",
+	}
+
+	ext, ok := allowedTypes[contentType]
+	if !ok {
+		return "", errors.New("only JPEG, PNG and GIF images are allowed")
+	}
+
+	_, err = file.Seek(0, io.SeekStart)
+	if err != nil {
+		return "", err
+	}
+
+	err = os.MkdirAll("./uploads", os.ModePerm)
+	if err != nil {
+		return "", err
+	}
+
+	id, err := uuid.NewV4()
+	if err != nil {
+		return "", err
+	}
+
+	filename := id.String() + ext
+	fullPath := filepath.Join("./uploads", filename)
+
+	dst, err := os.Create(fullPath)
+	if err != nil {
+		return "", err
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, file)
+	if err != nil {
+		_ = os.Remove(fullPath)
+		return "", err
+	}
+
+	log.Printf("Image saved successfully at: %s", fullPath)
+	return "/uploads/" + filename, nil
 }
 
 // CreatePost handles creating a new post
@@ -152,9 +227,95 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == http.MethodPost {
+		r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize+1024*1024)
+
+		err := r.ParseMultipartForm(maxUploadSize)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			data := PageData{
+				User:       user,
+				IsLoggedIn: true,
+				Categories: allCats,
+				Error:      "Image is too big. Maximum size is 20 MB.",
+			}
+			tmpl, tmplErr := template.ParseFiles("ui/html/base.layout.html", "ui/html/create.page.html")
+			if tmplErr == nil {
+				_ = tmpl.Execute(w, data)
+			}
+			return
+		}
+
 		title := r.FormValue("title")
 		content := r.FormValue("content")
 		categories := r.Form["categories"]
+
+		var imagePath string
+		file, header, err := r.FormFile("image")
+		if err != nil {
+			if err != http.ErrMissingFile {
+				log.Printf("FormFile error: %v", err)
+				w.WriteHeader(http.StatusBadRequest)
+				data := PageData{
+					User:       user,
+					IsLoggedIn: true,
+					Categories: allCats,
+					Error:      "Failed to read uploaded image.",
+					Post: models.Post{
+						Title:   title,
+						Content: content,
+					},
+				}
+				tmpl, tmplErr := template.ParseFiles("ui/html/base.layout.html", "ui/html/create.page.html")
+				if tmplErr == nil {
+					_ = tmpl.Execute(w, data)
+				}
+				return
+			}
+		} else {
+			defer file.Close()
+
+			log.Printf("Uploaded file detected: %s (%d bytes)", header.Filename, header.Size)
+
+			if header.Size > maxUploadSize {
+				w.WriteHeader(http.StatusBadRequest)
+				data := PageData{
+					User:       user,
+					IsLoggedIn: true,
+					Categories: allCats,
+					Error:      "Image is too big. Maximum size is 20 MB.",
+					Post: models.Post{
+						Title:   title,
+						Content: content,
+					},
+				}
+				tmpl, tmplErr := template.ParseFiles("ui/html/base.layout.html", "ui/html/create.page.html")
+				if tmplErr == nil {
+					_ = tmpl.Execute(w, data)
+				}
+				return
+			}
+
+			imagePath, err = saveUploadedImage(file, header)
+			if err != nil {
+				log.Printf("saveUploadedImage error: %v", err)
+				w.WriteHeader(http.StatusBadRequest)
+				data := PageData{
+					User:       user,
+					IsLoggedIn: true,
+					Categories: allCats,
+					Error:      err.Error(),
+					Post: models.Post{
+						Title:   title,
+						Content: content,
+					},
+				}
+				tmpl, tmplErr := template.ParseFiles("ui/html/base.layout.html", "ui/html/create.page.html")
+				if tmplErr == nil {
+					_ = tmpl.Execute(w, data)
+				}
+				return
+			}
+		}
 
 		var errMsg string
 		if strings.TrimSpace(title) == "" || strings.TrimSpace(content) == "" {
@@ -183,7 +344,10 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		res, err := database.DB.Exec("INSERT INTO posts (user_id, title, content) VALUES (?, ?, ?)", user.ID, title, content)
+		res, err := database.DB.Exec(
+			"INSERT INTO posts (user_id, title, content, image_path) VALUES (?, ?, ?, ?)",
+			user.ID, title, content, imagePath,
+		)
 		if err != nil {
 			log.Printf("Insert Post Error: %v", err)
 			ErrorPage(w, http.StatusInternalServerError, "500 - Failed to create post")
@@ -198,6 +362,9 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				if _, err := database.DB.Exec("INSERT INTO post_categories (post_id, category_id) VALUES (?, ?)", postID, catID); err != nil {
 					log.Printf("Insert Post Category Error: %v", err)
+					if imagePath != "" {
+						_ = os.Remove("." + imagePath)
+					}
 					ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
 					return
 				}
@@ -300,16 +467,19 @@ func ViewPost(w http.ResponseWriter, r *http.Request) {
 
 	user, isLoggedIn := GetUserFromSession(r)
 
-	query := `SELECT p.id, p.title, p.content, u.username, p.created_at,
-              (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = 1) as likes,
-              (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = -1) as dislikes
-              FROM posts p
-              JOIN users u ON p.user_id = u.id
-              WHERE p.id = ?`
+	query := `SELECT p.id, p.title, p.content, p.image_path, u.username, p.created_at,
+          (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = 1) as likes,
+          (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = -1) as dislikes
+          FROM posts p
+          JOIN users u ON p.user_id = u.id
+          WHERE p.id = ?`
 
 	var p models.Post
-	err := database.DB.QueryRow(query, postID).Scan(&p.ID, &p.Title, &p.Content, &p.Author, &p.CreatedAt, &p.Likes, &p.Dislikes)
+	var imagePath sql.NullString
 
+	err := database.DB.QueryRow(query, postID).Scan(
+		&p.ID, &p.Title, &p.Content, &imagePath, &p.Author, &p.CreatedAt, &p.Likes, &p.Dislikes,
+	)
 	if err == sql.ErrNoRows {
 		ErrorPage(w, http.StatusNotFound, "404 - Post Not Found")
 		return
@@ -319,7 +489,10 @@ func ViewPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Ασφαλής ανάκτηση κατηγοριών
+	if imagePath.Valid {
+		p.ImagePath = imagePath.String
+	}
+
 	catRows, err := database.DB.Query("SELECT c.name FROM categories c JOIN post_categories pc ON c.id = pc.category_id WHERE pc.post_id = ?", p.ID)
 	if err == nil {
 		defer catRows.Close()

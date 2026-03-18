@@ -8,17 +8,22 @@
             </div>
         {{end}}
 
-        <form action="/post/create" method="POST">
+        <form action="/post/create" method="POST" enctype="multipart/form-data">
             <div class="form-group">
-    <label>Title</label>
-    <input type="text" name="title" required placeholder="What's the topic?" value="{{.Post.Title}}">
-    <div class="helper">Keep it clear and specific (8–120 characters).</div>
-</div>
+                <label>Title</label>
+                <input type="text" name="title" required placeholder="What's the topic?" value="{{.Post.Title}}">
+                <div class="helper">Keep it clear and specific (8–120 characters).</div>
+            </div>
 
-<div class="form-group">
-    <label>Content</label>
-    <textarea name="content" rows="6" required placeholder="Write your post...">{{.Post.Content}}</textarea>
-</div>
+            <div class="form-group">
+                <label>Content</label>
+                <textarea name="content" rows="6" required placeholder="Write your post...">{{.Post.Content}}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="image">Upload image (JPEG, PNG, GIF, max 20 MB)</label>
+                <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/gif">
+            </div>
 
             <div class="form-group">
                 <label>Categories (select one or more)</label>
