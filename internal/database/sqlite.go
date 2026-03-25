@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"log"
+	"os"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -16,9 +17,16 @@ func InitDB() {
 		log.Fatal(err)
 	}
 
-	createTables()
-}
+	wd, _ := os.Getwd()
+	log.Println("Current working directory:", wd)
+	log.Println("Opening database: ./forum.db")
 
+	createTables()
+
+	var count int
+	_ = DB.QueryRow("SELECT COUNT(*) FROM posts").Scan(&count)
+	log.Println("Posts in database:", count)
+}
 func createTables() {
 	// Ενεργοποίηση Foreign Keys για την SQLite
 	_, _ = DB.Exec("PRAGMA foreign_keys = ON;")
@@ -48,6 +56,7 @@ func createTables() {
 			user_id INTEGER NOT NULL,
 			title TEXT NOT NULL,
 			content TEXT NOT NULL,
+			image_path TEXT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 		);`,
@@ -87,6 +96,7 @@ func createTables() {
 			log.Fatalf("Error creating table: %v", err)
 		}
 	}
+	_, _ = DB.Exec(`ALTER TABLE posts ADD COLUMN image_path TEXT`)
 
 	// Προσθήκη βασικών κατηγοριών
 	categories := []string{"Technology", "Health", "Music", "General"}

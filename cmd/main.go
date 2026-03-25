@@ -35,6 +35,9 @@ func main() {
 	fs := http.FileServer(http.Dir("./ui/static"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
+	uploadsFS := http.FileServer(http.Dir("./uploads"))
+	http.Handle("/uploads/", http.StripPrefix("/uploads/", uploadsFS))
+
 	// 4. Public Routes
 	http.HandleFunc("/", handlers.Home)
 	http.HandleFunc("/register", handlers.RegisterUser)
