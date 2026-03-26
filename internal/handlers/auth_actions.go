@@ -109,6 +109,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 			// Αντί για http.Error, ξαναφορτώνουμε τη σελίδα με μήνυμα Error
 			tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/login.page.html")
 			if err != nil {
+				ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
 				return
 			}
 			data := PageData{
