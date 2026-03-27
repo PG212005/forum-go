@@ -122,7 +122,11 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 
 		// ... (Ο υπόλοιπος κώδικας για το Session παραμένει ίδιος) ...
 		database.DB.Exec("DELETE FROM sessions WHERE user_id = ?", id)
-		sessionToken, _ := uuid.NewV4()
+		sessionToken, err := uuid.NewV4()
+		if err != nil {
+			ErrorPage(w, http.StatusInternalServerError, "500 - Session token error")
+			return
+		}
 		expiresAt := time.Now().Add(1 * time.Hour)
 		database.DB.Exec("INSERT INTO sessions (uuid, user_id, expires_at) VALUES (?, ?, ?)", sessionToken.String(), id, expiresAt)
 
