@@ -37,25 +37,5 @@
     <footer class="footer">
         <p>&copy; 2025 Go Forum Project</p>
     </footer>
-    {{if .IsLoggedIn}}
-    <script>
-        (function () {
-            var badge = document.getElementById("notification-badge");
-            if (!badge || typeof EventSource === "undefined") {
-                return;
-            }
-
-            var stream = new EventSource("/notifications/stream");
-            stream.onmessage = function (event) {
-                var count = parseInt(event.data, 10);
-                if (Number.isNaN(count)) {
-                    return;
-                }
-                badge.textContent = String(count);
-                badge.classList.toggle("is-hidden", count === 0);
-            };
-        }());
-    </script>
-    {{end}}
 </body>
 </html>
