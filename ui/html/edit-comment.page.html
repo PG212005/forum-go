@@ -1,0 +1,22 @@
+{{define "content"}}
+{{$comment := index .Comments 0}}
+<div class="auth-page">
+    <div class="auth-card create-card">
+        <h2 class="auth-title">Edit Comment</h2>
+        <p class="helper center">Post: <a href="/post?id={{$comment.PostID}}" class="link">{{$comment.PostTitle}}</a></p>
+        {{if .Error}}
+            <div class="alert alert--danger">⚠️ {{.Error}}</div>
+        {{end}}
+        <form action="/comment/edit?id={{$comment.ID}}" method="POST">
+            <div class="form-group">
+                <label>Comment</label>
+                <textarea name="content" rows="6" required>{{$comment.Content}}</textarea>
+            </div>
+            <div class="form-actions">
+                <a href="/post?id={{$comment.PostID}}" class="btn btn-outline btn-block">Cancel</a>
+                <button type="submit" class="btn btn-primary btn-block">Save Comment</button>
+            </div>
+        </form>
+    </div>
+</div>
+{{end}}

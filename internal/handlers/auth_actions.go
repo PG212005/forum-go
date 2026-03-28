@@ -3,7 +3,6 @@ package handlers
 import (
 	"database/sql"
 	"forum/internal/database"
-	"html/template"
 	"net/http"
 	"time"
 
@@ -15,13 +14,7 @@ import (
 func RegisterUser(w http.ResponseWriter, r *http.Request) {
 	// 1. GET Request
 	if r.Method == http.MethodGet {
-		tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/register.page.html")
-		if err != nil {
-			ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
-			return
-		}
-		data := PageData{IsLoggedIn: false}
-		if err := tmpl.Execute(w, data); err != nil {
+		if err := renderTemplate(w, "ui/html/register.page.html", PageData{IsLoggedIn: false}); err != nil {
 			ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
 		}
 		return
@@ -36,11 +29,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 		// Έλεγχος κενών
 		if email == "" || username == "" || password == "" {
 			w.WriteHeader(http.StatusBadRequest)
-			tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/register.page.html")
-			if err != nil {
-				return
-			}
-			_ = tmpl.Execute(w, PageData{IsLoggedIn: false, Error: "All fields are required"})
+			_ = renderTemplate(w, "ui/html/register.page.html", PageData{IsLoggedIn: false, Error: "All fields are required"})
 			return
 		}
 
@@ -52,17 +41,12 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 			// πριν το Execute για να το καταγράψει ο browser/audit tool.
 			w.WriteHeader(http.StatusBadRequest)
 
-			tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/register.page.html")
-			if err != nil {
-				return
-			}
-
 			// Περνάμε το μήνυμα "Username or Email already taken" στο template
 			data := PageData{
 				IsLoggedIn: false,
 				Error:      "Username or Email already taken",
 			}
-			_ = tmpl.Execute(w, data)
+			_ = renderTemplate(w, "ui/html/register.page.html", data)
 			return
 		}
 
@@ -78,13 +62,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 func LoginUser(w http.ResponseWriter, r *http.Request) {
 	// 1. GET Request: Show Form
 	if r.Method == http.MethodGet {
-		tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/login.page.html")
-		if err != nil {
-			ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
-			return
-		}
-		data := PageData{IsLoggedIn: false}
-		if err := tmpl.Execute(w, data); err != nil {
+		if err := renderTemplate(w, "ui/html/login.page.html", PageData{IsLoggedIn: false}); err != nil {
 			ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
 		}
 		return
@@ -106,17 +84,13 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		// ΕΔΩ ΕΙΝΑΙ Η ΑΛΛΑΓΗ:
 		if err == sql.ErrNoRows || bcrypt.CompareHashAndPassword([]byte(storedPassword), []byte(password)) != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			// Αντί για http.Error, ξαναφορτώνουμε τη σελίδα με μήνυμα Error
-			tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/login.page.html")
-			if err != nil {
-				ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
-				return
-			}
 			data := PageData{
 				IsLoggedIn: false,
 				Error:      "Invalid email or password", // Το μήνυμα λάθους
 			}
-			_ = tmpl.Execute(w, data)
+			if err := renderTemplate(w, "ui/html/login.page.html", data); err != nil {
+				ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
+			}
 			return
 		}
 

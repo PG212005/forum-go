@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Go Forum</title>
     <link rel="stylesheet" href="/static/css/style.css?v=2">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/heroicons@2.0.18/dist/heroicons.min.js"></script>
 </head>
 <body>
     <nav class="navbar">
@@ -15,6 +13,11 @@
 
             <div class="nav-links">
                 {{if .IsLoggedIn}}
+                    <a href="/activity" class="nav-link">Activity</a>
+                    <a href="/notifications" class="nav-link nav-notification" aria-label="Notifications">
+                        Notifications
+                        <span id="notification-badge" class="notification-badge {{if eq .UnreadNotifications 0}}is-hidden{{end}}">{{.UnreadNotifications}}</span>
+                    </a>
                     <span class="nav-user">Welcome, <b>{{.User.Username}}</b></span>
                     <a href="/logout" class="btn btn-outline">Logout</a>
                 {{else}}
@@ -34,5 +37,25 @@
     <footer class="footer">
         <p>&copy; 2025 Go Forum Project</p>
     </footer>
+    {{if .IsLoggedIn}}
+    <script>
+        (function () {
+            var badge = document.getElementById("notification-badge");
+            if (!badge || typeof EventSource === "undefined") {
+                return;
+            }
+
+            var stream = new EventSource("/notifications/stream");
+            stream.onmessage = function (event) {
+                var count = parseInt(event.data, 10);
+                if (Number.isNaN(count)) {
+                    return;
+                }
+                badge.textContent = String(count);
+                badge.classList.toggle("is-hidden", count === 0);
+            };
+        }());
+    </script>
+    {{end}}
 </body>
 </html>

@@ -41,6 +41,7 @@ func CreateComment(w http.ResponseWriter, r *http.Request) {
 		ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
 		return
 	}
+	createPostNotification(user.ID, postID, "post_commented")
 
 	// Return the user to the post after the comment is created.
 	http.Redirect(w, r, "/post?id="+postID, http.StatusSeeOther)

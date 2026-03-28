@@ -7,7 +7,13 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"sync"
 	"time"
+)
+
+var (
+	templateCache   = map[string]*template.Template{}
+	templateCacheMu sync.RWMutex
 )
 
 // GetUserFromSession returns the user ID and bool if logged in
@@ -44,13 +50,41 @@ func GetUserFromSession(r *http.Request) (models.User, bool) {
 	return user, true
 }
 
+func getTemplate(page string) (*template.Template, error) {
+	templateCacheMu.RLock()
+	tmpl, ok := templateCache[page]
+	templateCacheMu.RUnlock()
+	if ok {
+		return tmpl, nil
+	}
+
+	parsed, err := template.ParseFiles("ui/html/base.layout.html", page)
+	if err != nil {
+		return nil, err
+	}
+
+	templateCacheMu.Lock()
+	templateCache[page] = parsed
+	templateCacheMu.Unlock()
+
+	return parsed, nil
+}
+
+func renderTemplate(w http.ResponseWriter, page string, data PageData) error {
+	tmpl, err := getTemplate(page)
+	if err != nil {
+		return err
+	}
+	return tmpl.Execute(w, data)
+}
+
 // ErrorPage shows a nice error page
 func ErrorPage(w http.ResponseWriter, statusCode int, message string) {
 	// 1. Ορίζουμε το status code ΠΡΙΝ από οτιδήποτε άλλο (Κρίσιμο για το Audit)
 	w.WriteHeader(statusCode)
 
 	// 2. Προσπάθεια για parsing των templates
-	tmpl, err := template.ParseFiles("ui/html/base.layout.html", "ui/html/error.page.html")
+	tmpl, err := getTemplate("ui/html/error.page.html")
 	if err != nil {
 		// ΔΙΟΡΘΩΣΗ: Αν αποτύχει το template, ΔΕΝ ξανακαλούμε την ErrorPage.
 		// Στέλνουμε ένα απλό κείμενο ως έσχατη λύση για να αποφύγουμε το crash.

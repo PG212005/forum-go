@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3" // Χρειαζόμαστε τον driver
@@ -46,6 +47,7 @@ func setupTestDB() {
 		user_id INTEGER,
 		title TEXT,
 		content TEXT,
+		image_path TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE TABLE IF NOT EXISTS sessions (
@@ -103,6 +105,58 @@ func TestHomeHandler(t *testing.T) {
 	if status := rr.Code; status != http.StatusOK {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusOK)
+	}
+}
+
+func TestHomeHandlerSearchAndSort(t *testing.T) {
+	setupTestDB()
+
+	if _, err := database.DB.Exec(`INSERT INTO users (id, email, username, password) VALUES
+		(1, 'a@example.com', 'alice', 'hash'),
+		(2, 'b@example.com', 'bob', 'hash')`); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := database.DB.Exec(`INSERT INTO categories (id, name) VALUES (1, 'Technology'), (2, 'Music')`); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := database.DB.Exec(`INSERT INTO posts (id, user_id, title, content, image_path, created_at) VALUES
+		(1, 1, 'Go Search', 'Forum search is live', '', '2026-03-01 10:00:00'),
+		(2, 2, 'Cooking Notes', 'Nothing about backend work', '', '2026-03-02 10:00:00')`); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := database.DB.Exec(`INSERT INTO post_categories (post_id, category_id) VALUES (1, 1), (2, 2)`); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := database.DB.Exec(`INSERT INTO votes (user_id, post_id, type) VALUES (1, 1, 1), (2, 1, 1)`); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := database.DB.Exec(`INSERT INTO comments (post_id, user_id, content) VALUES (1, 2, 'nice feature')`); err != nil {
+		t.Fatal(err)
+	}
+
+	req, err := http.NewRequest("GET", "/?q=search&sort=liked", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	http.HandlerFunc(handlers.Home).ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Fatalf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	body := rr.Body.String()
+	if !strings.Contains(body, "Go Search") {
+		t.Fatalf("expected matching post to be rendered, body=%q", body)
+	}
+	if strings.Contains(body, "Cooking Notes") {
+		t.Fatalf("expected non-matching post to be filtered out, body=%q", body)
 	}
 }
 

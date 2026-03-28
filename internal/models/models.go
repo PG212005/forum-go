@@ -22,7 +22,9 @@ type Post struct {
 	Dislikes      int
 	CommentCount  int
 	CreatedAt     time.Time
+	UpdatedAt     time.Time
 	FormattedTime string
+	CanManage     bool
 }
 
 type Comment struct {
@@ -34,15 +36,53 @@ type Comment struct {
 	Likes         int
 	Dislikes      int
 	CreatedAt     time.Time
+	UpdatedAt     time.Time
 	FormattedTime string
+	PostTitle     string
+	PostAuthor    string
+	CanManage     bool
+}
+
+type Notification struct {
+	ID        int
+	ActorID   int
+	ActorName string
+	UserID    int
+	PostID    int
+	PostTitle string
+	Type      string
+	IsRead    bool
+	CreatedAt time.Time
+}
+
+type ActivityVote struct {
+	ID            int
+	Type          int
+	TargetType    string
+	TargetID      int
+	TargetContent string
+	PostID        int
+	PostTitle     string
+	CreatedAt     time.Time
 }
 
 type PageData struct {
-	IsLoggedIn bool
-	User       User
-	Posts      []Post
-	Post       Post
-	Comments   []Comment
-	Categories []string
-	Error      string
+	IsLoggedIn         bool
+	User               User
+	Posts              []Post
+	Post               Post
+	Comments           []Comment
+	Categories         []string
+	Notifications      []Notification
+	UnreadNotifications int
+	ActivityPosts      []Post
+	ActivityVotes      []ActivityVote
+	ActivityComments   []Comment
+	ManagedComments    []Comment
+	FormAction         string
+	SubmitLabel        string
+	PageTitle          string
+	SelectedCategories map[string]bool
+	Success            string
+	Error              string
 }

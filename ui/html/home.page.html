@@ -5,17 +5,39 @@
             <h3 class="sidebar-title">Filters</h3>
 
             <div class="sidebar-links">
-                <a href="/" class="filter-link">All Posts</a>
-                <a href="/?filter=liked" class="filter-link">Liked Posts</a>
-                <a href="/?filter=created" class="filter-link">My Posts</a>
+                <a href="/?sort={{.SortBy}}&q={{.SearchQuery}}" class="filter-link {{if eq .Filter ""}}is-active{{end}}">All Posts</a>
+                <a href="/?filter=liked&sort={{.SortBy}}&q={{.SearchQuery}}" class="filter-link {{if eq .Filter "liked"}}is-active{{end}}">Liked Posts</a>
+                <a href="/?filter=created&sort={{.SortBy}}&q={{.SearchQuery}}" class="filter-link {{if eq .Filter "created"}}is-active{{end}}">My Posts</a>
             </div>
+
+            <form action="/" method="GET" class="discovery-form">
+                {{if .Filter}}<input type="hidden" name="filter" value="{{.Filter}}">{{end}}
+                {{if .Category}}<input type="hidden" name="category" value="{{.Category}}">{{end}}
+                <label class="sidebar-label" for="search-input">Search</label>
+                <input id="search-input" type="search" name="q" value="{{.SearchQuery}}" placeholder="Title, content, author, category">
+
+                <label class="sidebar-label" for="sort-select">Sort by</label>
+                <select id="sort-select" name="sort" class="select-input">
+                    <option value="newest" {{if eq .SortBy "newest"}}selected{{end}}>Newest first</option>
+                    <option value="oldest" {{if eq .SortBy "oldest"}}selected{{end}}>Oldest first</option>
+                    <option value="liked" {{if eq .SortBy "liked"}}selected{{end}}>Most liked</option>
+                    <option value="discussed" {{if eq .SortBy "discussed"}}selected{{end}}>Most discussed</option>
+                </select>
+
+                <button type="submit" class="btn btn-primary btn-block">Apply</button>
+            </form>
 
             <h3 class="sidebar-title" style="margin-top: 1.5rem;">Categories</h3>
             <div class="sidebar-tags">
                 {{range .Categories}}
-                    <a href="/?category={{.}}" class="badge badge--primary">#{{.}}</a>
+                    <a href="/?category={{.}}&filter={{$.Filter}}&sort={{$.SortBy}}&q={{$.SearchQuery}}" class="badge badge--primary {{if eq $.Category .}}badge--active{{end}}">#{{.}}</a>
                 {{end}}
             </div>
+            {{if .Category}}
+                <div class="sidebar-clear">
+                    <a href="/?filter={{.Filter}}&sort={{.SortBy}}&q={{.SearchQuery}}" class="filter-link">Clear category</a>
+                </div>
+            {{end}}
 
             <div class="sidebar-cta">
                 <a href="/post/create" class="btn btn-primary btn-block">+ Create Post</a>
@@ -30,6 +52,10 @@
                 <a href="/login" class="link" style="margin-left: 10px; color: var(--primary); text-decoration: underline;">Login</a>
             </div>
         {{end}}
+        <div class="results-bar">
+            <p>{{len .Posts}} result{{if ne (len .Posts) 1}}s{{end}}{{if .SearchQuery}} for "<strong>{{.SearchQuery}}</strong>"{{end}}</p>
+            <p>Sorted by {{.SortBy}}</p>
+        </div>
         {{if .Posts}}
             {{range .Posts}}
                 <div class="card post-card" id="post-{{.ID}}">
