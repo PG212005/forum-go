@@ -10,6 +10,7 @@ import (
 
 var DB *sql.DB
 
+// InitDB opens the SQLite database, initializes schema, and logs basic startup info.
 func InitDB() {
 	var err error
 	DB, err = sql.Open("sqlite3", "./forum.db")
@@ -27,6 +28,9 @@ func InitDB() {
 	_ = DB.QueryRow("SELECT COUNT(*) FROM posts").Scan(&count)
 	log.Println("Posts in database:", count)
 }
+
+// createTables creates required tables if missing and applies lightweight additive migrations
+// so older database files remain compatible with the current code.
 func createTables() {
 	// Ενεργοποίηση Foreign Keys για την SQLite
 	_, _ = DB.Exec("PRAGMA foreign_keys = ON;")

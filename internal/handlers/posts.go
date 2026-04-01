@@ -192,6 +192,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// normalizeSort whitelists supported sort values and falls back to "newest".
 func normalizeSort(raw string) string {
 	switch raw {
 	case "oldest", "liked", "discussed":
@@ -201,6 +202,7 @@ func normalizeSort(raw string) string {
 	}
 }
 
+// orderByClause returns the SQL ORDER BY clause for the selected post sort mode.
 func orderByClause(sortBy string) string {
 	switch sortBy {
 	case "oldest":
@@ -216,6 +218,8 @@ func orderByClause(sortBy string) string {
 
 const maxUploadSize = 20 << 20 // 20 MB
 
+// saveUploadedImage validates content type, persists the file under /uploads,
+// and returns the public URL path.
 func saveUploadedImage(file multipart.File, header *multipart.FileHeader) (string, error) {
 	buffer := make([]byte, 512)
 	n, err := file.Read(buffer)
@@ -453,7 +457,7 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// RatePost handles Likes/Dislikes logic
+// RatePost applies, toggles, or switches a like/dislike vote on a post.
 func RatePost(w http.ResponseWriter, r *http.Request) {
 	user, isLoggedIn := GetUserFromSession(r)
 	if !isLoggedIn {
@@ -534,7 +538,7 @@ func RatePost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, target, http.StatusSeeOther)
 }
 
-// ViewPost handles displaying a single post and its comments
+// ViewPost renders a post details page together with its comments and counters.
 func ViewPost(w http.ResponseWriter, r *http.Request) {
 	postID := r.URL.Query().Get("id")
 	if postID == "" {

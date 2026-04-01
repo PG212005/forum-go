@@ -11,6 +11,7 @@ import (
 	"os"
 )
 
+// main wires configuration, routes, and starts the HTTP server.
 func main() {
 	// Load environment variables from the project root first, then fall back to cmd/.
 	err := config.LoadEnv(".env")

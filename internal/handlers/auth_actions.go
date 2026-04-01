@@ -10,7 +10,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// RegisterUser handles user registration
+// RegisterUser serves the registration form (GET) and creates users (POST).
 func RegisterUser(w http.ResponseWriter, r *http.Request) {
 	// 1. GET Request
 	if r.Method == http.MethodGet {
@@ -57,8 +57,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
-// LoginUser handles user login
-// LoginUser handles user login
+// LoginUser serves the login form (GET) and authenticates users (POST).
 func LoginUser(w http.ResponseWriter, r *http.Request) {
 	// 1. GET Request: Show Form
 	if r.Method == http.MethodGet {
@@ -118,7 +117,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
-// LogoutUser handles logout
+// LogoutUser invalidates the current session and clears the session cookie.
 func LogoutUser(w http.ResponseWriter, r *http.Request) {
 	c, err := r.Cookie("session_token")
 	if err == nil {

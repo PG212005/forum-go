@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+// tableHasColumn checks whether a table currently contains a specific column.
+// It is used to keep handlers compatible with older schema versions.
 func tableHasColumn(tableName, columnName string) bool {
 	rows, err := database.DB.Query(fmt.Sprintf("PRAGMA table_info(%s)", tableName))
 	if err != nil {
@@ -37,6 +39,7 @@ func tableHasColumn(tableName, columnName string) bool {
 	return false
 }
 
+// loadCategories returns all available category names sorted alphabetically.
 func loadCategories() []string {
 	rows, err := database.DB.Query("SELECT name FROM categories ORDER BY name ASC")
 	if err != nil {
@@ -54,6 +57,7 @@ func loadCategories() []string {
 	return categories
 }
 
+// selectedCategoryMap converts a category slice into a lookup map for templates.
 func selectedCategoryMap(categories []string) map[string]bool {
 	selected := make(map[string]bool, len(categories))
 	for _, category := range categories {
@@ -62,6 +66,7 @@ func selectedCategoryMap(categories []string) map[string]bool {
 	return selected
 }
 
+// getUnreadNotificationCount returns unread notification count for the given user.
 func getUnreadNotificationCount(userID int) int {
 	if userID == 0 || database.DB == nil {
 		return 0
@@ -74,6 +79,8 @@ func getUnreadNotificationCount(userID int) int {
 	return count
 }
 
+// createPostNotification inserts a notification for post owner interactions.
+// Self-actions are intentionally ignored.
 func createPostNotification(actorID int, postID string, notificationType string) {
 	if actorID == 0 || postID == "" {
 		return
@@ -94,6 +101,7 @@ func createPostNotification(actorID int, postID string, notificationType string)
 	}
 }
 
+// fetchNotifications returns the latest notifications for a user.
 func fetchNotifications(userID int) ([]models.Notification, error) {
 	query := `
 		SELECT n.id, n.actor_id, u.username, n.user_id, n.post_id, p.title, n.type, n.is_read, n.created_at
@@ -120,6 +128,7 @@ func fetchNotifications(userID int) ([]models.Notification, error) {
 	return notifications, nil
 }
 
+// fetchActivityPosts returns posts created by the user for the activity page.
 func fetchActivityPosts(userID int) ([]models.Post, error) {
 	updatedAtExpr := "p.created_at"
 	if tableHasColumn("posts", "updated_at") {
@@ -153,6 +162,7 @@ func fetchActivityPosts(userID int) ([]models.Post, error) {
 	return posts, nil
 }
 
+// fetchActivityVotes returns vote activity with enough post/comment context for rendering.
 func fetchActivityVotes(userID int) ([]models.ActivityVote, error) {
 	createdAtExpr := "CURRENT_TIMESTAMP"
 	orderByClause := "v.id DESC"
@@ -194,6 +204,7 @@ func fetchActivityVotes(userID int) ([]models.ActivityVote, error) {
 	return votes, nil
 }
 
+// fetchActivityComments returns comments authored by the user.
 func fetchActivityComments(userID int) ([]models.Comment, error) {
 	updatedAtExpr := "c.created_at"
 	if tableHasColumn("comments", "updated_at") {
@@ -225,14 +236,17 @@ func fetchActivityComments(userID int) ([]models.Comment, error) {
 	return comments, nil
 }
 
+// fetchManagedComments currently mirrors authored comments for the activity view.
 func fetchManagedComments(userID int) ([]models.Comment, error) {
 	return fetchActivityComments(userID)
 }
 
+// markNotificationsRead marks all unread notifications as read for the user.
 func markNotificationsRead(userID int) {
 	_, _ = database.DB.Exec("UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0", userID)
 }
 
+// removeStoredImage removes a post image from disk when it belongs to /uploads.
 func removeStoredImage(imagePath string) {
 	if imagePath == "" || !strings.HasPrefix(imagePath, "/uploads/") {
 		return
@@ -240,6 +254,7 @@ func removeStoredImage(imagePath string) {
 	_ = os.Remove("." + imagePath)
 }
 
+// ActivityPage renders the user's activity dashboard.
 func ActivityPage(w http.ResponseWriter, r *http.Request) {
 	user, isLoggedIn := GetUserFromSession(r)
 	if !isLoggedIn {
@@ -284,6 +299,7 @@ func ActivityPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// NotificationsPage renders notifications and marks them as read.
 func NotificationsPage(w http.ResponseWriter, r *http.Request) {
 	user, isLoggedIn := GetUserFromSession(r)
 	if !isLoggedIn {
@@ -311,6 +327,7 @@ func NotificationsPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// NotificationStream streams unread notification counts via Server-Sent Events.
 func NotificationStream(w http.ResponseWriter, r *http.Request) {
 	user, isLoggedIn := GetUserFromSession(r)
 	if !isLoggedIn {
@@ -348,6 +365,7 @@ func NotificationStream(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// EditPost serves and processes post edits for the post owner.
 func EditPost(w http.ResponseWriter, r *http.Request) {
 	user, isLoggedIn := GetUserFromSession(r)
 	if !isLoggedIn {
@@ -395,6 +413,7 @@ func EditPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	allCats := loadCategories()
+	// renderEditPost reuses the create template in edit mode by overriding page metadata.
 	renderEditPost := func(errMsg string) {
 		data := PageData{
 			User:                user,
@@ -464,6 +483,7 @@ func EditPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Update post body and categories atomically to avoid partial edits.
 	tx, err := database.DB.Begin()
 	if err != nil {
 		ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
@@ -498,6 +518,7 @@ func EditPost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/post?id="+postID, http.StatusSeeOther)
 }
 
+// DeletePost removes a post owned by the authenticated user.
 func DeletePost(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -540,6 +561,7 @@ func DeletePost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
+// EditComment serves and processes comment edits for the comment owner.
 func EditComment(w http.ResponseWriter, r *http.Request) {
 	user, isLoggedIn := GetUserFromSession(r)
 	if !isLoggedIn {
@@ -611,6 +633,7 @@ func EditComment(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/post?id="+strconv.Itoa(comment.PostID), http.StatusSeeOther)
 }
 
+// DeleteComment removes a comment owned by the authenticated user.
 func DeleteComment(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

@@ -16,7 +16,8 @@ var (
 	templateCacheMu sync.RWMutex
 )
 
-// GetUserFromSession returns the user ID and bool if logged in
+// GetUserFromSession resolves the currently logged-in user from the session cookie.
+// It returns false when the cookie is missing, invalid, or expired.
 func GetUserFromSession(r *http.Request) (models.User, bool) {
 	c, err := r.Cookie("session_token")
 	if err != nil {
@@ -50,6 +51,7 @@ func GetUserFromSession(r *http.Request) (models.User, bool) {
 	return user, true
 }
 
+// getTemplate returns a cached template when available, otherwise parses and caches it.
 func getTemplate(page string) (*template.Template, error) {
 	templateCacheMu.RLock()
 	tmpl, ok := templateCache[page]
@@ -70,6 +72,7 @@ func getTemplate(page string) (*template.Template, error) {
 	return parsed, nil
 }
 
+// renderTemplate renders a page template using the common base layout.
 func renderTemplate(w http.ResponseWriter, page string, data PageData) error {
 	tmpl, err := getTemplate(page)
 	if err != nil {
@@ -78,7 +81,7 @@ func renderTemplate(w http.ResponseWriter, page string, data PageData) error {
 	return tmpl.Execute(w, data)
 }
 
-// ErrorPage shows a nice error page
+// ErrorPage renders a consistent error page for user-facing failures.
 func ErrorPage(w http.ResponseWriter, statusCode int, message string) {
 	// 1. Ορίζουμε το status code ΠΡΙΝ από οτιδήποτε άλλο (Κρίσιμο για το Audit)
 	w.WriteHeader(statusCode)

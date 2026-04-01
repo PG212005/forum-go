@@ -33,6 +33,7 @@ type oauthTokenResponse struct {
 	TokenType   string `json:"token_type"`
 }
 
+// getGoogleConfig returns OAuth endpoints/scopes and credentials for Google.
 func getGoogleConfig() oauthProviderConfig {
 	return oauthProviderConfig{
 		Name:         "google",
@@ -49,6 +50,7 @@ func getGoogleConfig() oauthProviderConfig {
 	}
 }
 
+// getGithubConfig returns OAuth endpoints/scopes and credentials for GitHub.
 func getGithubConfig() oauthProviderConfig {
 	return oauthProviderConfig{
 		Name:         "github",
@@ -62,6 +64,7 @@ func getGithubConfig() oauthProviderConfig {
 	}
 }
 
+// newOAuthState creates a cryptographically random CSRF state token.
 func newOAuthState() (string, error) {
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
@@ -70,6 +73,7 @@ func newOAuthState() (string, error) {
 	return fmt.Sprintf("%x", buf), nil
 }
 
+// buildOAuthAuthURL constructs the provider authorization URL with required query params.
 func buildOAuthAuthURL(cfg oauthProviderConfig, state string) string {
 	query := url.Values{}
 	query.Set("client_id", cfg.ClientID)
@@ -83,6 +87,7 @@ func buildOAuthAuthURL(cfg oauthProviderConfig, state string) string {
 	return cfg.AuthURL + "?" + query.Encode()
 }
 
+// joinScopes converts a list of scopes into the space-separated OAuth format.
 func joinScopes(scopes []string) string {
 	if len(scopes) == 0 {
 		return ""
@@ -94,6 +99,8 @@ func joinScopes(scopes []string) string {
 	return result
 }
 
+// startOAuthLogin validates provider config, stores CSRF state in a cookie,
+// and redirects the user to the provider authorization page.
 func startOAuthLogin(w http.ResponseWriter, r *http.Request, cfg oauthProviderConfig) {
 	if cfg.ClientID == "" || cfg.ClientSecret == "" {
 		http.Error(w, "OAuth provider is not configured", http.StatusServiceUnavailable)
@@ -117,6 +124,7 @@ func startOAuthLogin(w http.ResponseWriter, r *http.Request, cfg oauthProviderCo
 	http.Redirect(w, r, buildOAuthAuthURL(cfg, state), http.StatusTemporaryRedirect)
 }
 
+// validateOAuthState compares callback state against the state cookie.
 func validateOAuthState(r *http.Request, providerName string) bool {
 	state := r.FormValue("state")
 	if state == "" {
@@ -131,6 +139,7 @@ func validateOAuthState(r *http.Request, providerName string) bool {
 	return cookie.Value == state
 }
 
+// exchangeCodeForToken exchanges an authorization code for an access token.
 func exchangeCodeForToken(cfg oauthProviderConfig, code string) (oauthTokenResponse, error) {
 	form := url.Values{}
 	form.Set("client_id", cfg.ClientID)
@@ -169,6 +178,7 @@ func exchangeCodeForToken(cfg oauthProviderConfig, code string) (oauthTokenRespo
 	return token, nil
 }
 
+// fetchOAuthJSON performs an authenticated GET request and decodes JSON into target.
 func fetchOAuthJSON(accessToken, endpoint string, target any) error {
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
@@ -192,6 +202,7 @@ func fetchOAuthJSON(accessToken, endpoint string, target any) error {
 	return json.NewDecoder(resp.Body).Decode(target)
 }
 
+// fetchGithubPrimaryEmail returns the best available verified GitHub email.
 func fetchGithubPrimaryEmail(accessToken string) (string, error) {
 	var emails []struct {
 		Email    string `json:"email"`
@@ -223,6 +234,7 @@ func GoogleLogin(w http.ResponseWriter, r *http.Request) {
 	startOAuthLogin(w, r, getGoogleConfig())
 }
 
+// GoogleCallback processes Google's OAuth callback and signs the user in.
 func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.FormValue("code")
 	if code == "" {
@@ -264,6 +276,7 @@ func GithubLogin(w http.ResponseWriter, r *http.Request) {
 	startOAuthLogin(w, r, getGithubConfig())
 }
 
+// GithubCallback processes GitHub's OAuth callback and signs the user in.
 func GithubCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.FormValue("code")
 	if code == "" {
@@ -312,7 +325,7 @@ func GithubCallback(w http.ResponseWriter, r *http.Request) {
 	handleOAuthUser(w, r, userInfo.Email, userInfo.Login, strconv.Itoa(userInfo.ID), "github")
 }
 
-// ΚΟΙΝΗ ΛΟΓΙΚΗ ΓΙΑ ΟΛΟΥΣ ΤΟΥΣ PROVIDERS
+// handleOAuthUser upserts an OAuth user and proceeds with session creation.
 func handleOAuthUser(w http.ResponseWriter, r *http.Request, email, username, providerID, providerName string) {
 	var userID int
 	query := fmt.Sprintf("SELECT id FROM users WHERE %s_id = ? OR email = ?", providerName)
@@ -349,7 +362,7 @@ func handleOAuthUser(w http.ResponseWriter, r *http.Request, email, username, pr
 	createSessionAndRedirect(w, r, userID)
 }
 
-// ΣΥΝΑΡΤΗΣΗ SESSION (ΠΡΕΠΕΙ ΝΑ ΥΠΑΡΧΕΙ ΣΤΟ ΑΡΧΕΙΟ)
+// createSessionAndRedirect replaces existing sessions for the user and issues a new cookie.
 func createSessionAndRedirect(w http.ResponseWriter, r *http.Request, userID int) {
 	if _, err := database.DB.Exec("DELETE FROM sessions WHERE user_id = ?", userID); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
