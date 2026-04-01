@@ -576,11 +576,15 @@ func EditComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var comment models.Comment
+	commentUpdatedAtExpr := "c.created_at"
+	if tableHasColumn("comments", "updated_at") {
+		commentUpdatedAtExpr = "c.updated_at"
+	}
 	err := database.DB.QueryRow(
-		`SELECT c.id, c.post_id, c.user_id, c.content, c.created_at, c.updated_at, p.title
+		fmt.Sprintf(`SELECT c.id, c.post_id, c.user_id, c.content, c.created_at, %s, p.title
 		 FROM comments c
 		 JOIN posts p ON p.id = c.post_id
-		 WHERE c.id = ?`,
+		 WHERE c.id = ?`, commentUpdatedAtExpr),
 		commentID,
 	).Scan(&comment.ID, &comment.PostID, &comment.UserID, &comment.Content, &comment.CreatedAt, &comment.UpdatedAt, &comment.PostTitle)
 	if err == sql.ErrNoRows {
@@ -625,7 +629,11 @@ func EditComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := database.DB.Exec("UPDATE comments SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", comment.Content, commentID); err != nil {
+	updateCommentQuery := "UPDATE comments SET content = ? WHERE id = ?"
+	if tableHasColumn("comments", "updated_at") {
+		updateCommentQuery = "UPDATE comments SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+	}
+	if _, err := database.DB.Exec(updateCommentQuery, comment.Content, commentID); err != nil {
 		ErrorPage(w, http.StatusInternalServerError, "500 - Failed to update comment")
 		return
 	}
@@ -672,5 +680,9 @@ func DeleteComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	target := r.Header.Get("Referer")
+	if target == "" {
+		target = "/post?id=" + strconv.Itoa(postID)
+	}
+	http.Redirect(w, r, target, http.StatusSeeOther)
 }
