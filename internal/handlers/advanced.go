@@ -362,8 +362,12 @@ func EditPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var post models.Post
+	postUpdatedAtExpr := "created_at"
+	if tableHasColumn("posts", "updated_at") {
+		postUpdatedAtExpr = "updated_at"
+	}
 	err := database.DB.QueryRow(
-		"SELECT id, user_id, title, content, COALESCE(image_path, ''), created_at, updated_at FROM posts WHERE id = ?",
+		fmt.Sprintf("SELECT id, user_id, title, content, COALESCE(image_path, ''), created_at, %s FROM posts WHERE id = ?", postUpdatedAtExpr),
 		postID,
 	).Scan(&post.ID, &post.UserID, &post.Title, &post.Content, &post.ImagePath, &post.CreatedAt, &post.UpdatedAt)
 	if err == sql.ErrNoRows {
@@ -467,7 +471,11 @@ func EditPost(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Exec("UPDATE posts SET title = ?, content = ?, image_path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", post.Title, post.Content, newImagePath, postID); err != nil {
+	updatePostQuery := "UPDATE posts SET title = ?, content = ?, image_path = ? WHERE id = ?"
+	if tableHasColumn("posts", "updated_at") {
+		updatePostQuery = "UPDATE posts SET title = ?, content = ?, image_path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+	}
+	if _, err := tx.Exec(updatePostQuery, post.Title, post.Content, newImagePath, postID); err != nil {
 		ErrorPage(w, http.StatusInternalServerError, "500 - Failed to update post")
 		return
 	}
