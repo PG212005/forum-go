@@ -10,6 +10,7 @@ import (
 
 var DB *sql.DB
 
+// InitDB opens the SQLite database, initializes schema, and logs basic startup info.
 func InitDB() {
 	var err error
 	DB, err = sql.Open("sqlite3", "./forum.db")
@@ -27,6 +28,9 @@ func InitDB() {
 	_ = DB.QueryRow("SELECT COUNT(*) FROM posts").Scan(&count)
 	log.Println("Posts in database:", count)
 }
+
+// createTables creates required tables if missing and applies lightweight additive migrations
+// so older database files remain compatible with the current code.
 func createTables() {
 	// Ενεργοποίηση Foreign Keys για την SQLite
 	_, _ = DB.Exec("PRAGMA foreign_keys = ON;")
@@ -58,6 +62,7 @@ func createTables() {
 			content TEXT NOT NULL,
 			image_path TEXT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 		);`,
 		`CREATE TABLE IF NOT EXISTS post_categories (
@@ -73,6 +78,7 @@ func createTables() {
 			user_id INTEGER NOT NULL,
 			content TEXT NOT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE,
 			FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 		);`,
@@ -81,12 +87,25 @@ func createTables() {
 			user_id INTEGER NOT NULL,
 			post_id INTEGER,
 			comment_id INTEGER,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			type INTEGER NOT NULL CHECK(type IN (1, -1)),
 			FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
 			FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE,
 			FOREIGN KEY(comment_id) REFERENCES comments(id) ON DELETE CASCADE,
 			UNIQUE(user_id, post_id),
 			UNIQUE(user_id, comment_id)
+		);`,
+		`CREATE TABLE IF NOT EXISTS notifications (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			actor_id INTEGER NOT NULL,
+			post_id INTEGER NOT NULL,
+			type TEXT NOT NULL CHECK(type IN ('post_liked', 'post_disliked', 'post_commented')),
+			is_read INTEGER NOT NULL DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+			FOREIGN KEY(actor_id) REFERENCES users(id) ON DELETE CASCADE,
+			FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE
 		);`,
 	}
 
@@ -97,6 +116,9 @@ func createTables() {
 		}
 	}
 	_, _ = DB.Exec(`ALTER TABLE posts ADD COLUMN image_path TEXT`)
+	_, _ = DB.Exec(`ALTER TABLE posts ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP`)
+	_, _ = DB.Exec(`ALTER TABLE comments ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP`)
+	_, _ = DB.Exec(`ALTER TABLE votes ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP`)
 
 	// Προσθήκη βασικών κατηγοριών
 	categories := []string{"Technology", "Health", "Music", "General"}

@@ -1,0 +1,79 @@
+{{define "content"}}
+<div class="activity-page">
+    <div class="card">
+        <h1 class="post-h1">My Activity</h1>
+        <p class="post-content">Track your posts, reactions, comments, and manage the content you own.</p>
+    </div>
+
+    <div class="card">
+        <h2 class="section-title">Posts You Created</h2>
+        {{if .ActivityPosts}}
+            {{range .ActivityPosts}}
+                <div class="activity-item">
+                    <div class="activity-copy">
+                        <a href="/post?id={{.ID}}" class="activity-link">{{.Title}}</a>
+                        <p class="post-content">{{.Content}}</p>
+                        <p class="meta-line">{{.Likes}} likes, {{.Dislikes}} dislikes, {{.CommentCount}} comments</p>
+                    </div>
+                    <div class="manage-row">
+                        <a href="/post/edit?id={{.ID}}" class="btn btn-outline">Edit</a>
+                        <form action="/post/delete" method="POST" class="inline-form">
+                            <input type="hidden" name="post_id" value="{{.ID}}">
+                            <button type="submit" class="btn btn-danger">Delete</button>
+                        </form>
+                    </div>
+                </div>
+            {{end}}
+        {{else}}
+            <p class="post-content">You have not created any posts yet.</p>
+        {{end}}
+    </div>
+
+    <div class="card">
+        <h2 class="section-title">Likes and Dislikes</h2>
+        {{if .ActivityVotes}}
+            {{range .ActivityVotes}}
+                <div class="activity-item">
+                    <div class="activity-copy">
+                        <p class="meta-line">
+                            <span class="vote-pill {{if eq .Type 1}}vote-pill--like{{else}}vote-pill--dislike{{end}}">
+                                {{if eq .Type 1}}△ Like{{else}}▽ Dislike{{end}}
+                            </span>
+                            on a {{.TargetType}}
+                        </p>
+                        <a href="/post?id={{.PostID}}" class="activity-link">{{.PostTitle}}</a>
+                        {{if .TargetContent}}
+                            <p class="post-content">{{.TargetContent}}</p>
+                        {{end}}
+                    </div>
+                </div>
+            {{end}}
+        {{else}}
+            <p class="post-content">You have not voted on any post or comment yet.</p>
+        {{end}}
+    </div>
+
+    <div class="card">
+        <h2 class="section-title">Comments You Wrote</h2>
+        {{if .ActivityComments}}
+            {{range .ActivityComments}}
+                <div class="activity-item">
+                    <div class="activity-copy">
+                        <a href="/post?id={{.PostID}}" class="activity-link">{{.PostTitle}}</a>
+                        <p class="post-content">{{.Content}}</p>
+                    </div>
+                    <div class="manage-row">
+                        <a href="/comment/edit?id={{.ID}}" class="btn btn-outline">Edit</a>
+                        <form action="/comment/delete" method="POST" class="inline-form">
+                            <input type="hidden" name="comment_id" value="{{.ID}}">
+                            <button type="submit" class="btn btn-danger">Delete</button>
+                        </form>
+                    </div>
+                </div>
+            {{end}}
+        {{else}}
+            <p class="post-content">You have not written any comments yet.</p>
+        {{end}}
+    </div>
+</div>
+{{end}}

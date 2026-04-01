@@ -1,0 +1,30 @@
+{{define "content"}}
+<div class="activity-page">
+    <div class="card">
+        <h1 class="post-h1">Notifications</h1>
+        <p class="post-content">Live updates for reactions and new comments on your posts.</p>
+    </div>
+
+    <div class="card">
+        {{if .Notifications}}
+            {{range .Notifications}}
+                <div class="activity-item">
+                    <div class="activity-copy">
+                        <p>
+                            <strong>@{{.ActorName}}</strong>
+                            {{if eq .Type "post_liked"}}liked{{end}}
+                            {{if eq .Type "post_disliked"}}disliked{{end}}
+                            {{if eq .Type "post_commented"}}commented on{{end}}
+                            your post
+                        </p>
+                        <a href="/post?id={{.PostID}}" class="activity-link">{{.PostTitle}}</a>
+                        <p class="meta-line">{{.CreatedAt}}</p>
+                    </div>
+                </div>
+            {{end}}
+        {{else}}
+            <p class="post-content">No notifications yet.</p>
+        {{end}}
+    </div>
+</div>
+{{end}}

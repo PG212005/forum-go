@@ -24,6 +24,16 @@
             {{end}}
         </div>
 
+        {{if .Post.CanManage}}
+        <div class="manage-row">
+            <a href="/post/edit?id={{.Post.ID}}" class="btn btn-outline">Edit Post</a>
+            <form action="/post/delete" method="POST" class="inline-form">
+                <input type="hidden" name="post_id" value="{{.Post.ID}}">
+                <button type="submit" class="btn btn-danger">Delete Post</button>
+            </form>
+        </div>
+        {{end}}
+
  <div class="post-actions">
   {{if $.IsLoggedIn}}
     <form action="/post/rate" method="POST" class="rate-row">
@@ -78,6 +88,16 @@
         </div>
 
         <p class="post-content">{{.Content}}</p>
+
+        {{if .CanManage}}
+        <div class="manage-row">
+            <a href="/comment/edit?id={{.ID}}" class="btn btn-outline">Edit Comment</a>
+            <form action="/comment/delete" method="POST" class="inline-form">
+                <input type="hidden" name="comment_id" value="{{.ID}}">
+                <button type="submit" class="btn btn-danger">Delete Comment</button>
+            </form>
+        </div>
+        {{end}}
 
         <div class="post-actions">
           {{if $.IsLoggedIn}}

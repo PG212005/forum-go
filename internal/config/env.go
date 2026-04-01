@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+// LoadEnv reads KEY=VALUE lines from a dotenv-style file and sets process env vars.
+// Blank lines and lines starting with '#' are ignored.
 func LoadEnv(filename string) error {
 	file, err := os.Open(filename)
 	if err != nil {

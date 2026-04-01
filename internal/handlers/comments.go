@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// CreateComment stores a new comment for a post by the authenticated user.
 func CreateComment(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -41,12 +42,13 @@ func CreateComment(w http.ResponseWriter, r *http.Request) {
 		ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
 		return
 	}
+	createPostNotification(user.ID, postID, "post_commented")
 
 	// Return the user to the post after the comment is created.
 	http.Redirect(w, r, "/post?id="+postID, http.StatusSeeOther)
 }
 
-// RateComment handles Likes/Dislikes for comments
+// RateComment applies, toggles, or switches a like/dislike vote on a comment.
 func RateComment(w http.ResponseWriter, r *http.Request) {
 	user, isLoggedIn := GetUserFromSession(r)
 	if !isLoggedIn {

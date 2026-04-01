@@ -11,6 +11,7 @@ import (
 	"os"
 )
 
+// main wires configuration, routes, and starts the HTTP server.
 func main() {
 	// Load environment variables from the project root first, then fall back to cmd/.
 	err := config.LoadEnv(".env")
@@ -52,10 +53,17 @@ func main() {
 
 	// 5. Protected Routes
 	http.HandleFunc("/post/create", middleware.RequireLogin(handlers.CreatePost))
+	http.HandleFunc("/post/edit", middleware.RequireLogin(handlers.EditPost))
+	http.HandleFunc("/post/delete", middleware.RequireLogin(handlers.DeletePost))
 	http.HandleFunc("/post", handlers.ViewPost)
 	http.HandleFunc("/post/rate", middleware.RequireLogin(handlers.RatePost))
 	http.HandleFunc("/comment/create", middleware.RequireLogin(handlers.CreateComment))
+	http.HandleFunc("/comment/edit", middleware.RequireLogin(handlers.EditComment))
+	http.HandleFunc("/comment/delete", middleware.RequireLogin(handlers.DeleteComment))
 	http.HandleFunc("/comment/rate", middleware.RequireLogin(handlers.RateComment))
+	http.HandleFunc("/activity", middleware.RequireLogin(handlers.ActivityPage))
+	http.HandleFunc("/notifications", middleware.RequireLogin(handlers.NotificationsPage))
+	http.HandleFunc("/notifications/stream", middleware.RequireLogin(handlers.NotificationStream))
 
 	// Wrap the default mux so unexpected panics return a controlled 500 response.
 	finalHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

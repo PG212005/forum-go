@@ -1,14 +1,14 @@
 {{define "content"}}
 <div class="auth-page">
     <div class="auth-card create-card">
-        <h2 class="auth-title">Create New Post</h2>
+        <h2 class="auth-title">{{if .PageTitle}}{{.PageTitle}}{{else}}Create New Post{{end}}</h2>
         {{if .Error}}
             <div class="alert alert--danger" style="margin-bottom: 1.5rem; padding: 1rem; border-radius: 8px; background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--danger); font-weight: 600; text-align: center;">
                 ⚠️ {{.Error}}
             </div>
         {{end}}
 
-        <form action="/post/create" method="POST" enctype="multipart/form-data">
+        <form action="{{if .FormAction}}{{.FormAction}}{{else}}/post/create{{end}}" method="POST" enctype="multipart/form-data">
             <div class="form-group">
                 <label>Title</label>
                 <input type="text" name="title" required placeholder="What's the topic?" value="{{.Post.Title}}">
@@ -23,6 +23,9 @@
             <div class="form-group">
                 <label for="image">Upload image (JPEG, PNG, GIF, max 20 MB)</label>
                 <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/gif">
+                {{if .Post.ImagePath}}
+                    <div class="helper">Current image: <a href="{{.Post.ImagePath}}" class="link">preview</a></div>
+                {{end}}
             </div>
 
             <div class="form-group">
@@ -30,7 +33,7 @@
                 <div class="category-box">
                     {{range .Categories}}
                         <label class="category-pill">
-                            <input type="checkbox" name="categories" value="{{.}}">
+                            <input type="checkbox" name="categories" value="{{.}}" {{if index $.SelectedCategories .}}checked{{end}}>
                             <span>#{{.}}</span>
                         </label>
                     {{end}}
@@ -39,7 +42,7 @@
 
             <div class="form-actions">
                 <a href="/" class="btn btn-outline btn-block">Cancel</a>
-                <button type="submit" class="btn btn-primary btn-block">🚀 Publish Post</button>
+                <button type="submit" class="btn btn-primary btn-block">{{if .SubmitLabel}}{{.SubmitLabel}}{{else}}Publish Post{{end}}</button>
             </div>
         </form>
     </div>
