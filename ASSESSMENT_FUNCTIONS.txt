@@ -1,0 +1,119 @@
+ΠΡΟΤΕΙΝΟΜΕΝΑ FILES ΚΑΙ FUNCTIONS ΓΙΑ ASSESSMENT
+================================================
+
+1. internal/handlers/auth_actions.go
+------------------------------------
+
+parseRegistrationForm
+validateRegistrationForm
+createUser
+RegisterUser
+handleRegistration
+parseLoginForm
+authenticateUser
+replaceUserSession
+setSessionCookie
+LoginUser
+handleLogin
+clearSessionCookie
+LogoutUser
+
+
+2. internal/handlers/posts.go
+-----------------------------
+
+parseHomeFilters
+Home
+requiresLogin
+buildHomeQuery
+queryPosts
+scanPostSummary
+normalizeSort
+orderByClause
+saveUploadedImage
+parsePostForm
+validatePostForm
+readPostImage
+insertPost
+CreatePost
+RatePost
+ViewPost
+
+
+3. internal/handlers/helpers.go
+-------------------------------
+
+GetUserFromSession
+getTemplate
+renderTemplate
+ErrorPage
+
+
+4. internal/handlers/authentication.go
+--------------------------------------
+
+newOAuthState
+buildOAuthAuthURL
+joinScopes
+startOAuthLogin
+validateOAuthState
+exchangeCodeForToken
+fetchOAuthJSON
+fetchGithubPrimaryEmail
+handleOAuthUser
+createSessionAndRedirect
+
+
+5. internal/handlers/comments.go
+--------------------------------
+
+CreateComment
+RateComment
+
+
+6. internal/handlers/advanced.go
+--------------------------------
+
+tableHasColumn
+loadCategories
+selectedCategoryMap
+getUnreadNotificationCount
+createPostNotification
+fetchNotifications
+fetchActivityPosts
+fetchActivityVotes
+fetchActivityComments
+markNotificationsRead
+removeStoredImage
+NotificationStream
+EditPost
+DeletePost
+EditComment
+DeleteComment
+
+
+7. internal/database/sqlite.go
+------------------------------
+
+InitDB
+createTables
+
+
+8. internal/middleware/auth.go
+------------------------------
+
+RequireLogin
+
+
+9. internal/config/env.go
+-------------------------
+
+LoadEnv
+
+
+10. Προτεινόμενα test files
+---------------------------
+
+internal/handlers/auth_actions_test.go
+internal/handlers/posts_test.go
+tests/handlers_test.go

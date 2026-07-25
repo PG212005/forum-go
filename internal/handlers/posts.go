@@ -43,6 +43,22 @@ type PageData struct {
 	Error               string
 }
 
+type homeFilters struct {
+	filter   string
+	category string
+	search   string
+	sort     string
+}
+
+func parseHomeFilters(r *http.Request) homeFilters {
+	return homeFilters{
+		filter:   r.URL.Query().Get("filter"),
+		category: r.URL.Query().Get("category"),
+		search:   strings.TrimSpace(r.URL.Query().Get("q")),
+		sort:     normalizeSort(r.URL.Query().Get("sort")),
+	}
+}
+
 // Home handles the main page and filters
 func Home(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
@@ -51,29 +67,55 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, isLoggedIn := GetUserFromSession(r)
-
-	filterBy := r.URL.Query().Get("filter")
-	categoryBy := r.URL.Query().Get("category")
-	searchQuery := strings.TrimSpace(r.URL.Query().Get("q"))
-	sortBy := normalizeSort(r.URL.Query().Get("sort"))
-
+	filters := parseHomeFilters(r)
 	allCats := loadCategories()
 
-	if (filterBy == "liked" || filterBy == "created") && !isLoggedIn {
+	if requiresLogin(filters) && !isLoggedIn {
 		data := PageData{
 			User:        user,
 			IsLoggedIn:  false,
 			Categories:  allCats,
-			Category:    categoryBy,
-			SearchQuery: searchQuery,
-			SortBy:      sortBy,
+			Category:    filters.category,
+			SearchQuery: filters.search,
+			SortBy:      filters.sort,
 			Error:       "You must be logged in to view your personalized filters.",
 		}
 		_ = renderTemplate(w, "ui/html/home.page.html", data)
 		return
 	}
 
-	baseQuery := `SELECT p.id, p.user_id, p.title, p.content, p.image_path, u.username, p.created_at,
+	query, args := buildHomeQuery(filters, user.ID, isLoggedIn)
+	posts, err := queryPosts(query, args, user.ID, isLoggedIn)
+	if err != nil {
+		log.Printf("Database Error in Home: %v", err)
+		ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
+		return
+	}
+
+	data := PageData{
+		User:                user,
+		IsLoggedIn:          isLoggedIn,
+		UnreadNotifications: getUnreadNotificationCount(user.ID),
+		Posts:               posts,
+		Categories:          allCats,
+		Filter:              filters.filter,
+		Category:            filters.category,
+		SearchQuery:         filters.search,
+		SortBy:              filters.sort,
+	}
+
+	if err := renderTemplate(w, "ui/html/home.page.html", data); err != nil {
+		log.Printf("Template Error in Home: %v", err)
+		ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
+	}
+}
+
+func requiresLogin(filters homeFilters) bool {
+	return filters.filter == "liked" || filters.filter == "created"
+}
+
+func buildHomeQuery(filters homeFilters, userID int, isLoggedIn bool) (string, []any) {
+	query := `SELECT p.id, p.user_id, p.title, p.content, p.image_path, u.username, p.created_at,
               (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = 1) as likes,
               (SELECT COUNT(*) FROM votes WHERE post_id = p.id AND type = -1) as dislikes,
               (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
@@ -87,30 +129,30 @@ func Home(w http.ResponseWriter, r *http.Request) {
 		args       []any
 	)
 
-	if categoryBy != "" {
+	if filters.category != "" {
 		conditions = append(conditions, `EXISTS (
 			SELECT 1
 			FROM post_categories pc
 			JOIN categories c ON pc.category_id = c.id
 			WHERE pc.post_id = p.id AND c.name = ?
 		)`)
-		args = append(args, categoryBy)
+		args = append(args, filters.category)
 	}
 
-	if filterBy == "liked" && isLoggedIn {
+	if filters.filter == "liked" && isLoggedIn {
 		conditions = append(conditions, `EXISTS (
 			SELECT 1
 			FROM votes v
 			WHERE v.post_id = p.id AND v.user_id = ? AND v.type = 1
 		)`)
-		args = append(args, user.ID)
-	} else if filterBy == "created" && isLoggedIn {
+		args = append(args, userID)
+	} else if filters.filter == "created" && isLoggedIn {
 		conditions = append(conditions, "p.user_id = ?")
-		args = append(args, user.ID)
+		args = append(args, userID)
 	}
 
-	if searchQuery != "" {
-		pattern := "%" + searchQuery + "%"
+	if filters.search != "" {
+		pattern := "%" + filters.search + "%"
 		conditions = append(conditions, `(LOWER(p.title) LIKE LOWER(?)
 			OR LOWER(p.content) LIKE LOWER(?)
 			OR LOWER(u.username) LIKE LOWER(?)
@@ -123,73 +165,56 @@ func Home(w http.ResponseWriter, r *http.Request) {
 		args = append(args, pattern, pattern, pattern, pattern)
 	}
 
-	query := baseQuery
 	if len(conditions) > 0 {
 		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
 	query += " GROUP BY p.id, p.user_id, p.title, p.content, p.image_path, u.username, p.created_at"
-	query += " " + orderByClause(sortBy)
+	query += " " + orderByClause(filters.sort)
+	return query, args
+}
 
+func queryPosts(query string, args []any, userID int, isLoggedIn bool) ([]models.Post, error) {
 	rows, err := database.DB.Query(query, args...)
-
 	if err != nil {
-		log.Printf("Database Error in Home: %v", err)
-		ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
-		return
+		return nil, err
 	}
 	defer rows.Close()
 
 	var posts []models.Post
 	for rows.Next() {
-		var p models.Post
-		var imagePath sql.NullString
-		var categoryList string
-
-		err := rows.Scan(
-			&p.ID,
-			&p.UserID,
-			&p.Title,
-			&p.Content,
-			&imagePath,
-			&p.Author,
-			&p.CreatedAt,
-			&p.Likes,
-			&p.Dislikes,
-			&p.CommentCount,
-			&categoryList,
-		)
+		p, err := scanPostSummary(rows, userID, isLoggedIn)
 		if err != nil {
 			log.Printf("Scan error in Home: %v", err)
 			continue
 		}
-		p.CanManage = isLoggedIn && p.UserID == user.ID
-
-		if imagePath.Valid {
-			p.ImagePath = imagePath.String
-		}
-		if categoryList != "" {
-			p.Categories = strings.Split(categoryList, ",")
-		}
-
 		posts = append(posts, p)
 	}
+	return posts, rows.Err()
+}
 
-	data := PageData{
-		User:       user,
-		IsLoggedIn: isLoggedIn,
-		UnreadNotifications: getUnreadNotificationCount(user.ID),
-		Posts:      posts,
-		Categories: allCats,
-		Filter:     filterBy,
-		Category:   categoryBy,
-		SearchQuery: searchQuery,
-		SortBy:     sortBy,
-	}
+type rowScanner interface {
+	Scan(dest ...any) error
+}
 
-	if err := renderTemplate(w, "ui/html/home.page.html", data); err != nil {
-		log.Printf("Template Error in Home: %v", err)
-		ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
+func scanPostSummary(row rowScanner, userID int, isLoggedIn bool) (models.Post, error) {
+	var p models.Post
+	var imagePath sql.NullString
+	var categoryList string
+	err := row.Scan(
+		&p.ID, &p.UserID, &p.Title, &p.Content, &imagePath, &p.Author,
+		&p.CreatedAt, &p.Likes, &p.Dislikes, &p.CommentCount, &categoryList,
+	)
+	if err != nil {
+		return models.Post{}, err
 	}
+	if imagePath.Valid {
+		p.ImagePath = imagePath.String
+	}
+	if categoryList != "" {
+		p.Categories = strings.Split(categoryList, ",")
+	}
+	p.CanManage = isLoggedIn && p.UserID == userID
+	return p, nil
 }
 
 // normalizeSort whitelists supported sort values and falls back to "newest".
@@ -273,7 +298,109 @@ func saveUploadedImage(file multipart.File, header *multipart.FileHeader) (strin
 	return "/uploads/" + filename, nil
 }
 
-// CreatePost handles creating a new post
+type postForm struct {
+	title      string
+	content    string
+	categories []string
+}
+
+func newPostPageData(user models.User, allCategories []string, form postForm, errMessage string) PageData {
+	return PageData{
+		User:                user,
+		IsLoggedIn:          true,
+		Categories:          allCategories,
+		UnreadNotifications: getUnreadNotificationCount(user.ID),
+		SelectedCategories:  selectedCategoryMap(form.categories),
+		FormAction:          "/post/create",
+		SubmitLabel:         "Publish Post",
+		PageTitle:           "Create New Post",
+		Error:               errMessage,
+		Post: models.Post{
+			Title:   form.title,
+			Content: form.content,
+		},
+	}
+}
+
+func renderCreatePostError(w http.ResponseWriter, data PageData) {
+	w.WriteHeader(http.StatusBadRequest)
+	_ = renderTemplate(w, "ui/html/create.page.html", data)
+}
+
+func parsePostForm(r *http.Request) postForm {
+	return postForm{
+		title:      r.FormValue("title"),
+		content:    r.FormValue("content"),
+		categories: r.Form["categories"],
+	}
+}
+
+func validatePostForm(form postForm) error {
+	if strings.TrimSpace(form.title) == "" || strings.TrimSpace(form.content) == "" {
+		return errors.New("Title and Content cannot be empty")
+	}
+	if len(form.categories) == 0 {
+		return errors.New("At least one category is required")
+	}
+	return nil
+}
+
+func readPostImage(r *http.Request) (string, error) {
+	file, header, err := r.FormFile("image")
+	if err == http.ErrMissingFile {
+		return "", nil
+	}
+	if err != nil {
+		return "", errors.New("Failed to read uploaded image.")
+	}
+	defer file.Close()
+
+	if header.Size > maxUploadSize {
+		return "", errors.New("Image is too big. Maximum size is 20 MB.")
+	}
+	return saveUploadedImage(file, header)
+}
+
+func insertPost(userID int, form postForm, imagePath string) error {
+	tx, err := database.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.Exec(
+		"INSERT INTO posts (user_id, title, content, image_path) VALUES (?, ?, ?, ?)",
+		userID, form.title, form.content, imagePath,
+	)
+	if err != nil {
+		return err
+	}
+	postID, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	for _, category := range form.categories {
+		result, err := tx.Exec(
+			`INSERT INTO post_categories (post_id, category_id)
+			 SELECT ?, id FROM categories WHERE name = ?`,
+			postID, category,
+		)
+		if err != nil {
+			return err
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if affected == 0 {
+			return fmt.Errorf("unknown category %q", category)
+		}
+	}
+	return tx.Commit()
+}
+
+// CreatePost serves the post form and coordinates validation, upload, and storage.
 func CreatePost(w http.ResponseWriter, r *http.Request) {
 	user, isLoggedIn := GetUserFromSession(r)
 	if !isLoggedIn {
@@ -281,180 +408,41 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allCats := loadCategories()
-
-	if r.Method == http.MethodPost {
-		r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize+1024*1024)
-
-		err := r.ParseMultipartForm(maxUploadSize)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			data := PageData{
-				User:                user,
-				IsLoggedIn:          true,
-				Categories:          allCats,
-				UnreadNotifications: getUnreadNotificationCount(user.ID),
-				SelectedCategories:  selectedCategoryMap(nil),
-				FormAction:          "/post/create",
-				SubmitLabel:         "Publish Post",
-				PageTitle:           "Create New Post",
-				Error:               "Image is too big. Maximum size is 20 MB.",
-			}
-			_ = renderTemplate(w, "ui/html/create.page.html", data)
-			return
+	allCategories := loadCategories()
+	if r.Method != http.MethodPost {
+		data := newPostPageData(user, allCategories, postForm{}, "")
+		if err := renderTemplate(w, "ui/html/create.page.html", data); err != nil {
+			ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
 		}
-
-		title := r.FormValue("title")
-		content := r.FormValue("content")
-		categories := r.Form["categories"]
-
-		var imagePath string
-		file, header, err := r.FormFile("image")
-		if err != nil {
-			if err != http.ErrMissingFile {
-				log.Printf("FormFile error: %v", err)
-				w.WriteHeader(http.StatusBadRequest)
-				data := PageData{
-					User:                user,
-					IsLoggedIn:          true,
-					UnreadNotifications: getUnreadNotificationCount(user.ID),
-					Categories:          allCats,
-					SelectedCategories:  selectedCategoryMap(categories),
-					FormAction:          "/post/create",
-					SubmitLabel:         "Publish Post",
-					PageTitle:           "Create New Post",
-					Error:               "Failed to read uploaded image.",
-					Post: models.Post{
-						Title:   title,
-						Content: content,
-					},
-				}
-				_ = renderTemplate(w, "ui/html/create.page.html", data)
-				return
-			}
-		} else {
-			defer file.Close()
-
-			log.Printf("Uploaded file detected: %s (%d bytes)", header.Filename, header.Size)
-
-			if header.Size > maxUploadSize {
-				w.WriteHeader(http.StatusBadRequest)
-				data := PageData{
-					User:                user,
-					IsLoggedIn:          true,
-					UnreadNotifications: getUnreadNotificationCount(user.ID),
-					Categories:          allCats,
-					SelectedCategories:  selectedCategoryMap(categories),
-					FormAction:          "/post/create",
-					SubmitLabel:         "Publish Post",
-					PageTitle:           "Create New Post",
-					Error:               "Image is too big. Maximum size is 20 MB.",
-					Post: models.Post{
-						Title:   title,
-						Content: content,
-					},
-				}
-				_ = renderTemplate(w, "ui/html/create.page.html", data)
-				return
-			}
-
-			imagePath, err = saveUploadedImage(file, header)
-			if err != nil {
-				log.Printf("saveUploadedImage error: %v", err)
-				w.WriteHeader(http.StatusBadRequest)
-				data := PageData{
-					User:                user,
-					IsLoggedIn:          true,
-					UnreadNotifications: getUnreadNotificationCount(user.ID),
-					Categories:          allCats,
-					SelectedCategories:  selectedCategoryMap(categories),
-					FormAction:          "/post/create",
-					SubmitLabel:         "Publish Post",
-					PageTitle:           "Create New Post",
-					Error:               err.Error(),
-					Post: models.Post{
-						Title:   title,
-						Content: content,
-					},
-				}
-				_ = renderTemplate(w, "ui/html/create.page.html", data)
-				return
-			}
-		}
-
-		var errMsg string
-		if strings.TrimSpace(title) == "" || strings.TrimSpace(content) == "" {
-			errMsg = "Title and Content cannot be empty"
-		} else if len(categories) == 0 {
-			errMsg = "At least one category is required"
-		}
-
-		if errMsg != "" {
-			w.WriteHeader(http.StatusBadRequest)
-			data := PageData{
-				User:                user,
-				IsLoggedIn:          true,
-				UnreadNotifications: getUnreadNotificationCount(user.ID),
-				Categories:          allCats,
-				SelectedCategories:  selectedCategoryMap(categories),
-				FormAction:          "/post/create",
-				SubmitLabel:         "Publish Post",
-				PageTitle:           "Create New Post",
-				Error:               errMsg,
-				Post: models.Post{
-					Title:   title,
-					Content: content,
-				},
-			}
-			_ = renderTemplate(w, "ui/html/create.page.html", data)
-			return
-		}
-
-		res, err := database.DB.Exec(
-			"INSERT INTO posts (user_id, title, content, image_path) VALUES (?, ?, ?, ?)",
-			user.ID, title, content, imagePath,
-		)
-		if err != nil {
-			log.Printf("Insert Post Error: %v", err)
-			ErrorPage(w, http.StatusInternalServerError, "500 - Failed to create post")
-			return
-		}
-
-		postID, _ := res.LastInsertId()
-
-		for _, catName := range categories {
-			var catID int
-			err := database.DB.QueryRow("SELECT id FROM categories WHERE name = ?", catName).Scan(&catID)
-			if err == nil {
-				if _, err := database.DB.Exec("INSERT INTO post_categories (post_id, category_id) VALUES (?, ?)", postID, catID); err != nil {
-					log.Printf("Insert Post Category Error: %v", err)
-					if imagePath != "" {
-						_ = os.Remove("." + imagePath)
-					}
-					ErrorPage(w, http.StatusInternalServerError, "500 - Internal Server Error")
-					return
-				}
-			}
-		}
-
-		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
-	data := PageData{
-		User:                user,
-		IsLoggedIn:          true,
-		Categories:          allCats,
-		UnreadNotifications: getUnreadNotificationCount(user.ID),
-		FormAction:          "/post/create",
-		SubmitLabel:         "Publish Post",
-		PageTitle:           "Create New Post",
-		SelectedCategories:  selectedCategoryMap(nil),
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize+1024*1024)
+	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+		data := newPostPageData(user, allCategories, postForm{}, "Image is too big. Maximum size is 20 MB.")
+		renderCreatePostError(w, data)
+		return
 	}
-	if err := renderTemplate(w, "ui/html/create.page.html", data); err != nil {
-		ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
-		ErrorPage(w, http.StatusInternalServerError, "500 - Template Error")
+
+	form := parsePostForm(r)
+	if err := validatePostForm(form); err != nil {
+		renderCreatePostError(w, newPostPageData(user, allCategories, form, err.Error()))
+		return
 	}
+
+	imagePath, err := readPostImage(r)
+	if err != nil {
+		renderCreatePostError(w, newPostPageData(user, allCategories, form, err.Error()))
+		return
+	}
+
+	if err := insertPost(user.ID, form, imagePath); err != nil {
+		log.Printf("Insert Post Error: %v", err)
+		removeStoredImage(imagePath)
+		ErrorPage(w, http.StatusInternalServerError, "500 - Failed to create post")
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 // RatePost applies, toggles, or switches a like/dislike vote on a post.
@@ -622,11 +610,11 @@ func ViewPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := PageData{
-		User:       user,
-		IsLoggedIn: isLoggedIn,
+		User:                user,
+		IsLoggedIn:          isLoggedIn,
 		UnreadNotifications: getUnreadNotificationCount(user.ID),
-		Post:       p,
-		Comments:   comments,
+		Post:                p,
+		Comments:            comments,
 	}
 
 	if err := renderTemplate(w, "ui/html/post.page.html", data); err != nil {
