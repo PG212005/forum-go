@@ -1,119 +1,60 @@
 ΠΡΟΤΕΙΝΟΜΕΝΑ FILES ΚΑΙ FUNCTIONS ΓΙΑ ASSESSMENT
 ================================================
 
-1. internal/handlers/auth_actions.go
-------------------------------------
+ΔΥΣΚΟΛΙΑ
+---------
 
-parseRegistrationForm
-validateRegistrationForm
-createUser
-RegisterUser
-handleRegistration
-parseLoginForm
-authenticateUser
-replaceUserSession
-setSessionCookie
-LoginUser
-handleLogin
-clearSessionCookie
-LogoutUser
+[Εύκολη]  Μικρό, επαναλαμβανόμενο pattern ή απλή validation.
+[Μεσαία]  Συνδυάζει parsing, HTTP, SQL ή error handling.
+[Δύσκολη] Πολλά βήματα, transactions, concurrency ή σύνθετο SQL/OAuth.
 
 
-2. internal/handlers/posts.go
+1. internal/handlers/posts.go
 -----------------------------
 
-parseHomeFilters
-Home
-requiresLogin
-buildHomeQuery
-queryPosts
-scanPostSummary
-normalizeSort
-orderByClause
-saveUploadedImage
-parsePostForm
-validatePostForm
-readPostImage
-insertPost
-CreatePost
-RatePost
-ViewPost
+[Εύκολη]  normalizeSort
+[Εύκολη]  orderByClause
+[Εύκολη]  validatePostForm
+[Μεσαία]  parseHomeFilters
+[Μεσαία]  saveUploadedImage
+[Μεσαία]  scanPostSummary
+[Δύσκολη] buildHomeQuery
+[Δύσκολη] insertPost
+
+
+2. internal/handlers/auth_actions.go
+------------------------------------
+
+[Εύκολη]  validateRegistrationForm
+[Εύκολη]  parseLoginForm
+[Εύκολη]  clearSessionCookie
+[Μεσαία]  authenticateUser
+[Δύσκολη] replaceUserSession
 
 
 3. internal/handlers/helpers.go
 -------------------------------
 
-GetUserFromSession
-getTemplate
-renderTemplate
-ErrorPage
+[Μεσαία]  GetUserFromSession
+[Δύσκολη] getTemplate
 
 
-4. internal/handlers/authentication.go
+4. internal/handlers/advanced.go
+--------------------------------
+
+[Δύσκολη] fetchActivityVotes
+[Δύσκολη] NotificationStream
+
+
+5. internal/handlers/authentication.go
 --------------------------------------
 
-newOAuthState
-buildOAuthAuthURL
-joinScopes
-startOAuthLogin
-validateOAuthState
-exchangeCodeForToken
-fetchOAuthJSON
-fetchGithubPrimaryEmail
-handleOAuthUser
-createSessionAndRedirect
+[Δύσκολη] exchangeCodeForToken
 
 
-5. internal/handlers/comments.go
---------------------------------
+ΠΡΟΤΕΙΝΟΜΕΝΑ TEST FILES
+-----------------------
 
-CreateComment
-RateComment
-
-
-6. internal/handlers/advanced.go
---------------------------------
-
-tableHasColumn
-loadCategories
-selectedCategoryMap
-getUnreadNotificationCount
-createPostNotification
-fetchNotifications
-fetchActivityPosts
-fetchActivityVotes
-fetchActivityComments
-markNotificationsRead
-removeStoredImage
-NotificationStream
-EditPost
-DeletePost
-EditComment
-DeleteComment
-
-
-7. internal/database/sqlite.go
-------------------------------
-
-InitDB
-createTables
-
-
-8. internal/middleware/auth.go
-------------------------------
-
-RequireLogin
-
-
-9. internal/config/env.go
--------------------------
-
-LoadEnv
-
-
-10. Προτεινόμενα test files
----------------------------
-
-internal/handlers/auth_actions_test.go
-internal/handlers/posts_test.go
-tests/handlers_test.go
+[Εύκολη]  internal/handlers/auth_actions_test.go
+[Μεσαία]  internal/handlers/posts_test.go
+[Δύσκολη] tests/handlers_test.go
