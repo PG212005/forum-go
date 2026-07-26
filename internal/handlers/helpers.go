@@ -19,7 +19,7 @@ var (
 // GetUserFromSession resolves the currently logged-in user from the session cookie.
 // It returns false when the cookie is missing, invalid, or expired.
 func GetUserFromSession(r *http.Request) (models.User, bool) {
-	c, err := r.Cookie("session_token")
+	c, err := r.Cookie(sessionCookieName)
 	if err != nil {
 		return models.User{}, false
 	}
@@ -66,6 +66,10 @@ func getTemplate(page string) (*template.Template, error) {
 	}
 
 	templateCacheMu.Lock()
+	if cached, ok := templateCache[page]; ok {
+		templateCacheMu.Unlock()
+		return cached, nil
+	}
 	templateCache[page] = parsed
 	templateCacheMu.Unlock()
 

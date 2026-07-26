@@ -197,11 +197,21 @@ func fetchActivityVotes(userID int) ([]models.ActivityVote, error) {
 	for rows.Next() {
 		var item models.ActivityVote
 		var createdAt sql.NullString
-		if err := rows.Scan(&item.ID, &item.Type, &item.TargetType, &item.TargetID, &item.TargetContent, &item.PostID, &item.PostTitle, &createdAt); err == nil {
-			votes = append(votes, item)
+		if err := rows.Scan(
+			&item.ID,
+			&item.Type,
+			&item.TargetType,
+			&item.TargetID,
+			&item.TargetContent,
+			&item.PostID,
+			&item.PostTitle,
+			&createdAt,
+		); err != nil {
+			return nil, err
 		}
+		votes = append(votes, item)
 	}
-	return votes, nil
+	return votes, rows.Err()
 }
 
 // fetchActivityComments returns comments authored by the user.
@@ -345,12 +355,17 @@ func NotificationStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	sendCount := func() {
-		fmt.Fprintf(w, "data: %d\n\n", getUnreadNotificationCount(user.ID))
+	sendCount := func() error {
+		if _, err := fmt.Fprintf(w, "data: %d\n\n", getUnreadNotificationCount(user.ID)); err != nil {
+			return err
+		}
 		flusher.Flush()
+		return nil
 	}
 
-	sendCount()
+	if err := sendCount(); err != nil {
+		return
+	}
 
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
@@ -360,7 +375,9 @@ func NotificationStream(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case <-ticker.C:
-			sendCount()
+			if err := sendCount(); err != nil {
+				return
+			}
 		}
 	}
 }

@@ -45,16 +45,22 @@ func renderAuthPage(w http.ResponseWriter, page, errorMessage string, statusCode
 	}
 }
 
-func parseRegistrationForm(r *http.Request) registrationForm {
-	return registrationForm{
-		email:    strings.TrimSpace(r.FormValue("email")),
-		username: strings.TrimSpace(r.FormValue("username")),
-		password: r.FormValue("password"),
+func parseRegistrationForm(r *http.Request) (registrationForm, error) {
+	if err := r.ParseForm(); err != nil {
+		return registrationForm{}, err
 	}
+
+	return registrationForm{
+		email:    strings.TrimSpace(r.PostForm.Get("email")),
+		username: strings.TrimSpace(r.PostForm.Get("username")),
+		password: r.PostForm.Get("password"),
+	}, nil
 }
 
 func validateRegistrationForm(form registrationForm) error {
-	if form.email == "" || form.username == "" || form.password == "" {
+	if strings.TrimSpace(form.email) == "" ||
+		strings.TrimSpace(form.username) == "" ||
+		form.password == "" {
 		return errors.New("All fields are required")
 	}
 	return nil
@@ -87,7 +93,11 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleRegistration(w http.ResponseWriter, r *http.Request) {
-	form := parseRegistrationForm(r)
+	form, err := parseRegistrationForm(r)
+	if err != nil {
+		renderAuthPage(w, "ui/html/register.page.html", "Invalid form submission", http.StatusBadRequest)
+		return
+	}
 	if err := validateRegistrationForm(form); err != nil {
 		renderAuthPage(w, "ui/html/register.page.html", err.Error(), http.StatusBadRequest)
 		return
@@ -99,11 +109,15 @@ func handleRegistration(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
-func parseLoginForm(r *http.Request) loginForm {
-	return loginForm{
-		email:    strings.TrimSpace(r.FormValue("email")),
-		password: r.FormValue("password"),
+func parseLoginForm(r *http.Request) (loginForm, error) {
+	if err := r.ParseForm(); err != nil {
+		return loginForm{}, err
 	}
+
+	return loginForm{
+		email:    strings.TrimSpace(r.PostForm.Get("email")),
+		password: r.PostForm.Get("password"),
+	}, nil
 }
 
 func authenticateUser(form loginForm) (int, error) {
@@ -113,7 +127,7 @@ func authenticateUser(form loginForm) (int, error) {
 		"SELECT id, password FROM users WHERE email = ?",
 		form.email,
 	).Scan(&userID, &passwordHash)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, errInvalidCredentials
 	}
 	if err != nil {
@@ -182,7 +196,13 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {
-	userID, err := authenticateUser(parseLoginForm(r))
+	form, err := parseLoginForm(r)
+	if err != nil {
+		renderAuthPage(w, "ui/html/login.page.html", "Invalid form submission", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := authenticateUser(form)
 	if errors.Is(err, errInvalidCredentials) {
 		renderAuthPage(w, "ui/html/login.page.html", "Invalid email or password", http.StatusBadRequest)
 		return

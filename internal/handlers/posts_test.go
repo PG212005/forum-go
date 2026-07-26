@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"bytes"
+	"mime/multipart"
 	"net/http/httptest"
 	"reflect"
 	"strings"
@@ -20,6 +22,42 @@ func TestParseHomeFilters(t *testing.T) {
 
 	if got != want {
 		t.Fatalf("parseHomeFilters() = %#v, want %#v", got, want)
+	}
+}
+
+func TestParsePostFormParsesMultipartValues(t *testing.T) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	fields := []struct {
+		name  string
+		value string
+	}{
+		{name: "title", value: "Recall"},
+		{name: "content", value: "Practice HTTP parsing"},
+		{name: "categories", value: "Go"},
+		{name: "categories", value: "Web"},
+	}
+	for _, field := range fields {
+		if err := writer.WriteField(field.name, field.value); err != nil {
+			t.Fatalf("WriteField() error: %v", err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("multipart writer close error: %v", err)
+	}
+
+	request := httptest.NewRequest("POST", "/post/create", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+
+	got, err := parsePostForm(request)
+	if err != nil {
+		t.Fatalf("parsePostForm() unexpected error: %v", err)
+	}
+	if got.title != "Recall" || got.content != "Practice HTTP parsing" {
+		t.Fatalf("single-value fields parsed incorrectly: %#v", got)
+	}
+	if want := []string{"Go", "Web"}; !reflect.DeepEqual(got.categories, want) {
+		t.Fatalf("categories = %#v, want %#v", got.categories, want)
 	}
 }
 

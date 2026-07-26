@@ -184,8 +184,7 @@ func queryPosts(query string, args []any, userID int, isLoggedIn bool) ([]models
 	for rows.Next() {
 		p, err := scanPostSummary(rows, userID, isLoggedIn)
 		if err != nil {
-			log.Printf("Scan error in Home: %v", err)
-			continue
+			return nil, err
 		}
 		posts = append(posts, p)
 	}
@@ -327,12 +326,16 @@ func renderCreatePostError(w http.ResponseWriter, data PageData) {
 	_ = renderTemplate(w, "ui/html/create.page.html", data)
 }
 
-func parsePostForm(r *http.Request) postForm {
-	return postForm{
-		title:      r.FormValue("title"),
-		content:    r.FormValue("content"),
-		categories: r.Form["categories"],
+func parsePostForm(r *http.Request) (postForm, error) {
+	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+		return postForm{}, err
 	}
+
+	return postForm{
+		title:      r.PostForm.Get("title"),
+		content:    r.PostForm.Get("content"),
+		categories: r.PostForm["categories"],
+	}, nil
 }
 
 func validatePostForm(form postForm) error {
@@ -418,13 +421,13 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize+1024*1024)
-	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+	form, err := parsePostForm(r)
+	if err != nil {
 		data := newPostPageData(user, allCategories, postForm{}, "Image is too big. Maximum size is 20 MB.")
 		renderCreatePostError(w, data)
 		return
 	}
 
-	form := parsePostForm(r)
 	if err := validatePostForm(form); err != nil {
 		renderCreatePostError(w, newPostPageData(user, allCategories, form, err.Error()))
 		return

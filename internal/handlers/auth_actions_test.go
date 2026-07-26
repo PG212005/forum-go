@@ -18,7 +18,10 @@ func TestParseRegistrationFormTrimsIdentityFields(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(values.Encode()))
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	got := parseRegistrationForm(request)
+	got, err := parseRegistrationForm(request)
+	if err != nil {
+		t.Fatalf("parseRegistrationForm() unexpected error: %v", err)
+	}
 
 	if got.email != "student@example.com" || got.username != "student" {
 		t.Fatalf("identity fields were not trimmed: %#v", got)
@@ -28,19 +31,71 @@ func TestParseRegistrationFormTrimsIdentityFields(t *testing.T) {
 	}
 }
 
-func TestValidateRegistrationForm(t *testing.T) {
-	valid := registrationForm{
-		email:    "student@example.com",
-		username: "student",
-		password: "secret",
+func TestParseLoginFormParsesPostBody(t *testing.T) {
+	values := url.Values{
+		"email":    {"  student@example.com  "},
+		"password": {" password with spaces "},
 	}
-	if err := validateRegistrationForm(valid); err != nil {
-		t.Fatalf("valid form returned error: %v", err)
+	request := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(values.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	got, err := parseLoginForm(request)
+	if err != nil {
+		t.Fatalf("parseLoginForm() unexpected error: %v", err)
+	}
+	if got.email != "student@example.com" {
+		t.Fatalf("email = %q, want trimmed email", got.email)
+	}
+	if got.password != " password with spaces " {
+		t.Fatalf("password was unexpectedly changed: %q", got.password)
+	}
+}
+
+func TestParseLoginFormReturnsMalformedBodyError(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader("%"))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	if _, err := parseLoginForm(request); err == nil {
+		t.Fatal("parseLoginForm() returned nil error for malformed form body")
+	}
+}
+
+func TestValidateRegistrationForm(t *testing.T) {
+	tests := []struct {
+		name    string
+		form    registrationForm
+		wantErr bool
+	}{
+		{
+			name: "valid",
+			form: registrationForm{
+				email:    "student@example.com",
+				username: "student",
+				password: "secret",
+			},
+		},
+		{
+			name:    "missing email",
+			form:    registrationForm{username: "student", password: "secret"},
+			wantErr: true,
+		},
+		{
+			name:    "username contains only spaces",
+			form:    registrationForm{email: "student@example.com", username: "   ", password: "secret"},
+			wantErr: true,
+		},
 	}
 
-	valid.email = ""
-	if err := validateRegistrationForm(valid); err == nil {
-		t.Fatal("empty email did not return an error")
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateRegistrationForm(test.form)
+			if test.wantErr && err == nil {
+				t.Fatal("validateRegistrationForm() returned nil error")
+			}
+			if !test.wantErr && err != nil {
+				t.Fatalf("validateRegistrationForm() unexpected error: %v", err)
+			}
+		})
 	}
 }
 
